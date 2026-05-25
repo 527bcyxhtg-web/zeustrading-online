@@ -1,0 +1,12 @@
+.env
+*.sqlite3
+*.db
+__pycache__/
+*.pyc
+logs/
+.wrangler/
+.netlify/
+.uix/
+supabase/.temp/
+.DS_Store
+node_modules/

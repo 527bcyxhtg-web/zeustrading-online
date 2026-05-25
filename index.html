@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zeus Trading Live Desk</title>
+    <link rel="stylesheet" href="styles.css?v=20260525-live-desk-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+          <div class="brand-mark">ZT</div>
+          <div>
+            <strong>Zeus Trading</strong>
+            <span>Trading cockpit</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-section="agent" type="button">
+            <span class="icon" aria-hidden="true">⚡</span>
+            Live Desk
+          </button>
+          <button class="nav-item" data-section="scanner" type="button">
+            <span class="icon" aria-hidden="true">⌁</span>
+            Chart + Scanner
+          </button>
+          <button class="nav-item" data-section="calendar" type="button">
+            <span class="icon" aria-hidden="true">◷</span>
+            Calendar + News
+          </button>
+          <button class="nav-item" data-section="bot-builder" type="button">
+            <span class="icon" aria-hidden="true">◎</span>
+            Bot Builder
+          </button>
+          <button class="nav-item" data-section="active-agent" type="button">
+            <span class="icon" aria-hidden="true">◌</span>
+            Agent
+          </button>
+          <button class="nav-item" data-section="clob-wallet" type="button">
+            <span class="icon" aria-hidden="true">◈</span>
+            Wallet + CLOB
+          </button>
+          <button class="nav-item" data-section="bot-connectors" type="button">
+            <span class="icon" aria-hidden="true">▣</span>
+            Bot Connectors
+          </button>
+          <button class="nav-item" data-section="dashboard" type="button">
+            <span class="icon" aria-hidden="true">⌂</span>
+            Metrics
+          </button>
+          <button class="nav-item" data-section="tarot" type="button">
+            <span class="icon" aria-hidden="true">✦</span>
+            Tarot Check
+          </button>
+          <button class="nav-item" data-section="profile" type="button">
+            <span class="icon" aria-hidden="true">◍</span>
+            Profile
+          </button>
+          <button class="nav-item" data-section="risk" type="button">
+            <span class="icon" aria-hidden="true">◷</span>
+            Risk
+          </button>
+          <button class="nav-item" data-section="journal" type="button">
+            <span class="icon" aria-hidden="true">☰</span>
+            Journal
+          </button>
+        </nav>
+
+        <div class="sidebar-note">
+          <span>Rule mode</span>
+            <strong id="sidebarMode">FundedElite Flash</strong>
+          <small>Protected Live: live chart context, macro gate, MT5 preview, manual approval.</small>
+        </div>
+
+        <div class="sidebar-profile">
+          <span id="sidebarProfileStatus">Guest mode</span>
+          <strong id="sidebarProfileName">No profile</strong>
+          <small id="sidebarProfileHelp">Register or log in to save bot settings.</small>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="cockpit-workspace" data-panel="agent" aria-label="Premium protected live chart cockpit">
+          <div class="market-toolbar">
+            <div class="toolbar-symbol">
+              <strong id="cockpitSymbolLabel">AAPL</strong>
+              <span id="cockpitInstrumentMeta">Protected Live · MT5 Bridge</span>
+            </div>
+            <select id="symbolSelect" aria-label="Focus symbol">
+              <option>AAPL</option>
+              <option>NVDA</option>
+              <option>AMD</option>
+              <option>TSLA</option>
+              <option>SPY</option>
+              <option>QQQ</option>
+              <option>XAUUSD</option>
+              <option>EURUSD</option>
+              <option>BTCUSD</option>
+            </select>
+            <div class="timeframe-tabs" aria-label="Timeframe">
+              <button type="button">1D</button>
+              <button class="active" type="button">5D</button>
+              <button type="button">1M</button>
+              <button type="button">3M</button>
+              <button type="button">1Y</button>
+            </div>
+            <button class="toolbar-button quick-jump" type="button" data-quick-target="scanner">Indicators</button>
+            <button class="toolbar-button quick-jump" type="button" data-quick-target="signal">Alert</button>
+            <button class="toolbar-button quick-jump" type="button" data-quick-target="active-agent">Replay</button>
+            <label class="toolbar-rules">
+              Rules
+              <select id="phaseSelect">
+                <option value="fundedEliteFlash">FundedElite Flash</option>
+                <option value="twoStep">FTMO 2-Step</option>
+                <option value="oneStep">FTMO 1-Step</option>
+              </select>
+            </label>
+            <button id="saveSnapshot" class="toolbar-button strong" type="button">Save Audit</button>
+          </div>
+
+          <div class="chart-cockpit-grid">
+            <aside class="chart-tools-rail" aria-label="Chart tools">
+              <button class="active" type="button" title="Crosshair">+</button>
+              <button type="button" title="Trendline">⌁</button>
+              <button type="button" title="Levels">☰</button>
+              <button type="button" title="Brush">⌒</button>
+              <button type="button" title="Text">T</button>
+              <button type="button" title="Measure">↕</button>
+              <button type="button" title="Lock">□</button>
+              <button type="button" title="Settings">◎</button>
+            </aside>
+
+            <section class="premium-chart-stage" aria-label="Custom Zeus market chart">
+              <div class="chart-header-row">
+                <div>
+                  <h1 id="cockpitChartTitle">Apple Inc · 1D · NASDAQ</h1>
+                  <div class="chart-ohlc" id="cockpitOhlc">O -- H -- L -- C --</div>
+                </div>
+                <div class="chart-price-block">
+                  <strong id="cockpitPrice">--</strong>
+                  <span id="cockpitChange">Connecting</span>
+                </div>
+              </div>
+              <div class="chart-surface">
+                <svg id="premiumChartSvg" class="premium-chart-svg" viewBox="0 0 980 520" role="img" aria-label="Custom candlestick chart"></svg>
+                <div class="price-line-label" id="activePriceLabel">--</div>
+                <div class="chart-watermark">Zeus Trading</div>
+                <div class="chart-overlay-card">
+                  <span>Agent thesis</span>
+                  <strong id="cockpitLastAction">Waiting for live scan</strong>
+                  <small id="cockpitApprovalState">Manual approval required before any live submit.</small>
+                </div>
+              </div>
+            </section>
+
+            <aside class="agent-risk-sidebar" aria-label="Agent and risk gate">
+              <div class="agent-side-header">
+                <span>Protected Live</span>
+                <strong id="cockpitAgentStatus">Agent waiting</strong>
+              </div>
+              <div class="risk-gauge-card">
+                <div class="risk-gauge-ring" id="cockpitRiskGauge"><span>--</span></div>
+                <div>
+                  <strong id="cockpitRiskStatus">Risk gate not run</strong>
+                  <small>SL/TP, drawdown, news, spread and manual approval must pass.</small>
+                </div>
+              </div>
+              <div class="agent-mini-chain">
+                <article class="passed"><span></span><strong>Market Data</strong><small id="cockpitDataStatus">Connecting</small></article>
+                <article><span></span><strong>Indicators</strong><small>EMA · VWAP · RSI · ATR</small></article>
+                <article><span></span><strong>Rules</strong><small id="cockpitRuleStatus">FundedElite / FTMO guard</small></article>
+                <article><span></span><strong>Execution</strong><small id="cockpitMt5Status">MT5 disconnected</small></article>
+              </div>
+              <div class="cockpit-actions">
+                <button id="heroPreflight" class="primary-action" type="button">Run Risk Gate</button>
+                <button class="secondary-action quick-jump" type="button" data-quick-target="bot-builder">Build Bot</button>
+                <button class="secondary-action quick-jump" type="button" data-quick-target="active-agent">Run Agent</button>
+                <button id="heroTarot" class="secondary-action" type="button">Risk Tarot</button>
+              </div>
+              <a class="agent-chat-link cockpit-chat-link" href="/chat/?session=agent%3Amain%3Amain">Open Agent Chat</a>
+            </aside>
+          </div>
+
+          <div class="cockpit-status-bar">
+            <div id="tickerTape" class="ticker-tape">
+              <span>Loading market data <strong>...</strong></span>
+            </div>
+            <div class="market-connection">
+              <span id="marketConnectionDot" class="connection-dot loading"></span>
+              <strong id="marketConnectionStatus">Connecting</strong>
+              <time id="marketLastUpdated">--:--:--</time>
+            </div>
+          </div>
+        </section>
+
+        <section class="live-desk-order" aria-label="Simple protected live workflow">
+          <article class="live-order-card active">
+            <span>1</span>
+            <strong>Live chart</strong>
+            <small>Crypto live via CoinGecko, stocks/FX delayed when available, fallback guarded.</small>
+          </article>
+          <article class="live-order-card">
+            <span>2</span>
+            <strong>Calendar + news</strong>
+            <small>High-impact events move the system to wait/block before any setup.</small>
+          </article>
+          <article class="live-order-card">
+            <span>3</span>
+            <strong>Scanner</strong>
+            <small>VWAP, EMA, RSI, ATR, volume spike and market map create candidates only.</small>
+          </article>
+          <article class="live-order-card">
+            <span>4</span>
+            <strong>Risk gate</strong>
+            <small>FundedElite/FTMO buffers, SL, TP, R:R, spread and max loss decide.</small>
+          </article>
+          <article class="live-order-card">
+            <span>5</span>
+            <strong>Approve</strong>
+            <small>MT5/Crypto preview is visible. Live submit requires your click and audit log.</small>
+          </article>
+        </section>
+
+        <section class="guided-flow-panel" data-panel="guided-flow" aria-label="Guided trading system flow">
+          <div class="guided-flow-header">
+            <div>
+              <h2>Guided Protected Live Flow</h2>
+              <p>Jednostavno: prvo profil i API ključevi, zatim live data, zatim agent chain, zatim order preview, zatim ručno odobrenje za live.</p>
+            </div>
+            <span id="guidedFlowStatus" class="status-chip warning">Step 1 / Setup</span>
+          </div>
+          <div class="guided-flow-grid" id="guidedFlowSteps"></div>
+          <div class="agent-sync-board">
+            <div>
+              <h3>Agent Sync Board</h3>
+              <p>Svi agenti rade sinkronizirano. Testnet/mock može biti automatski; live submit ostaje zaključan iza risk gatea i user approvala.</p>
+            </div>
+            <div id="agentSyncMatrix" class="agent-sync-matrix"></div>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="main-column">
+            <section class="panel command-panel" data-panel="command">
+              <div class="panel-header">
+                <div>
+                  <h2>Protected Live Command Center</h2>
+                  <p>The system supervises live-ready trade plans: market map, indicators, FTMO/FundedElite rules, MT5 bridge preview, manual approval, and journal.</p>
+                </div>
+                <span id="agentMode" class="status-chip warning">Protected Live</span>
+              </div>
+
+              <div class="command-layout">
+                <div>
+                  <div class="function-grid">
+                    <article class="function-card">
+                      <span>01</span>
+                      <strong>Ingest context</strong>
+                      <small>Market data, watchlist, macro/news risk, TradingView ideas as education, and prop-firm constraints.</small>
+                    </article>
+                    <article class="function-card">
+                      <span>02</span>
+                      <strong>Generate setup</strong>
+                      <small>VWAP reclaim, EMA momentum, opening range breakout, trend continuation, or gold session playbook.</small>
+                    </article>
+                    <article class="function-card">
+                      <span>03</span>
+                      <strong>Risk approve</strong>
+                      <small>Position size, mandatory stop-loss, daily loss buffer, max trades, spread, volatility, and R:R gate.</small>
+                    </article>
+                    <article class="function-card">
+                      <span>04</span>
+                      <strong>Approve + journal</strong>
+                      <small>Manual approval, MT5 response, kill-switch status, rule violations, expectancy, and audit trail.</small>
+                    </article>
+                  </div>
+
+                  <div id="agentPlan" class="agent-output"></div>
+                </div>
+
+                <div class="agent-builder">
+                  <h3>Strategy Builder</h3>
+                  <label>
+                    Challenge model
+                    <select id="agentChallenge">
+                      <option value="fundedEliteFlash">FundedElite Flash Activation</option>
+                      <option value="twoStep">FTMO 2-Step</option>
+                      <option value="oneStep">FTMO 1-Step</option>
+                    </select>
+                  </label>
+                  <label>
+                    Primary market
+                    <select id="agentMarket">
+                      <option value="xau">XAUUSD / Gold</option>
+                      <option value="indices">SPY / QQQ / US indices</option>
+                      <option value="stocks">Large-cap stocks</option>
+                      <option value="fx">EURUSD / majors</option>
+                    </select>
+                  </label>
+                  <label>
+                    Strategy style
+                    <select id="agentStyle">
+                      <option value="vwap">VWAP reclaim + volume</option>
+                      <option value="orb">Opening range breakout</option>
+                      <option value="trend">EMA trend continuation</option>
+                      <option value="mean">Mean reversion at key levels</option>
+                    </select>
+                  </label>
+                  <label>
+                    Target evaluation days
+                    <input id="agentDays" type="number" value="20" min="5" max="60" step="1" />
+                  </label>
+                  <label>
+                    Max trades per day
+                    <input id="agentMaxTrades" type="number" value="3" min="1" max="5" step="1" />
+                  </label>
+                  <button id="generateAgentPlan" class="primary-action" type="button">Generate Agent Plan</button>
+                  <button id="askOpenRouter" class="secondary-action" type="button">Run OpenRouter Agent</button>
+                  <div class="ai-status">
+                    <span>Model route</span>
+                    <strong id="openRouterModel">arcee-ai/trinity-large-thinking:free</strong>
+                  </div>
+                  <pre id="openRouterOutput" class="ai-output">OpenRouter agent is connected. Click Run OpenRouter Agent to review the selected prop-firm strategy plan with the AI model.</pre>
+                  <small class="builder-note">This creates a protected live supervision plan, not financial advice or a guaranteed challenge pass.</small>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel live-sources-panel" data-panel="live-sources">
+              <div class="panel-header">
+                <div>
+                  <h2>Live Sources + Safety Map</h2>
+                  <p>Jedan pregled: chart feed, macro calendar, Polymarket context, OctoBot research, MEXC testnet i wallet funding status.</p>
+                </div>
+                <span class="status-chip safe">Protected routing</span>
+              </div>
+              <div class="source-action-grid">
+                <article>
+                  <span>Chart feed</span>
+                  <strong id="sourceChartStatus">Connecting</strong>
+                  <small>Crypto live; stocks/FX delayed or simulated when provider is unavailable.</small>
+                  <button id="refreshLiveDesk" class="secondary-action" type="button">Refresh Live Data</button>
+                </article>
+                <article>
+                  <span>Macro calendar</span>
+                  <strong>Investing-style review</strong>
+                  <small>Use calendar events as risk blockers, not entry signals.</small>
+                  <a class="secondary-action" href="https://www.investing.com/economic-calendar/" target="_blank" rel="noreferrer">Open Calendar</a>
+                </article>
+                <article>
+                  <span>Crypto bot lab</span>
+                  <strong>MEXC Futures Testnet</strong>
+                  <small>For test routing and symbol research. Live crypto funding stays wallet-approved.</small>
+                  <a class="secondary-action" href="https://futures.testnet.mexc.com/futures/BTC_USDT" target="_blank" rel="noreferrer">Open Testnet</a>
+                </article>
+                <article>
+                  <span>Strategy research</span>
+                  <strong>OctoBot + Polymarket</strong>
+                  <small>Research context only until a protected adapter is explicitly added.</small>
+                  <div class="mini-link-row">
+                    <a href="https://www.octobot.cloud/explore" target="_blank" rel="noreferrer">OctoBot</a>
+                    <a href="https://polymarket.com/" target="_blank" rel="noreferrer">Polymarket</a>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel bot-connectors-panel" data-panel="bot-connectors">
+              <div class="panel-header">
+                <div>
+                  <h2>Bot Connectors + CMC Skills</h2>
+                  <p>Pionex, 3Commas and CoinMarketCap Agent Skills are connected as safe research/preview routes. Live execution remains protected by risk gate and manual approval.</p>
+                </div>
+                <span id="botConnectorStatus" class="status-chip warning">Preview mode</span>
+              </div>
+              <div class="connector-grid" id="botConnectorGrid"></div>
+              <div class="connector-workbench">
+                <div class="connector-form">
+                  <label>
+                    Connector
+                    <select id="connectorSelect">
+                      <option value="agentscope-runtime">AgentScope Multi-Agent Runtime</option>
+                      <option value="apibricks-console">APIBricks Console + API Keys</option>
+                      <option value="pionex-bot">Pionex BTC/USDT Bot</option>
+                      <option value="cmc-agent-skills">CoinMarketCap Agent Skills</option>
+                      <option value="threecommas-dashboard">3Commas Dashboard</option>
+                    </select>
+                  </label>
+                  <label>
+                    Use case
+                    <select id="connectorUseCase">
+                      <option value="market-analysis">Market analysis</option>
+                      <option value="grid-bot">Grid bot research</option>
+                      <option value="dca-bot">DCA bot research</option>
+                      <option value="smart-trade">SmartTrade / manual plan</option>
+                      <option value="prop-risk">Prop-firm risk overlay</option>
+                    </select>
+                  </label>
+                  <label>
+                    Symbol
+                    <input id="connectorSymbol" type="text" value="BTC_USDT" />
+                  </label>
+                  <label>
+                    Max connector risk %
+                    <input id="connectorRisk" type="number" value="0.25" min="0.05" max="1" step="0.05" />
+                  </label>
+                  <label class="approval-toggle connector-approval">
+                    <input id="connectorNoWithdraw" type="checkbox" checked />
+                    <span>API keys must have no withdrawal permission</span>
+                  </label>
+                  <label class="approval-toggle connector-approval">
+                    <input id="connectorManualApproval" type="checkbox" checked />
+                    <span>Require Zeus manual approval before any external action</span>
+                  </label>
+                  <div class="connector-actions">
+                    <button id="loadBotConnectors" class="secondary-action" type="button">Load Connectors</button>
+                    <button id="buildConnectorPreview" class="primary-action" type="button">Build Connector Preview</button>
+                    <button id="openSelectedConnector" class="secondary-action" type="button">Open Selected Bot</button>
+                  </div>
+                </div>
+                <div>
+                  <div id="cmcSkillsList" class="skills-list"></div>
+                  <pre id="connectorPreviewOutput" class="exchange-output">No connector preview yet. Load connectors, choose a bot route, then build a protected preview.</pre>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel bot-builder-panel" data-panel="bot-builder">
+              <div class="panel-header">
+                <div>
+                  <h2>Protected Live Bot Builder</h2>
+                  <p>Three steps: choose market + strategy, lock risk + challenge rules, preview through MT5 bridge, then manually approve.</p>
+                </div>
+                <span id="botReadiness" class="status-chip warning">Protected setup</span>
+              </div>
+
+              <div class="bot-builder-guide">
+                <article>
+                  <span>01</span>
+                  <strong>Choose market + strategy</strong>
+                  <small>Pick instrument class, setup style, and indicator stack.</small>
+                </article>
+                <article>
+                  <span>02</span>
+                  <strong>Risk + Challenge Rules</strong>
+                  <small>SL, TP, risk %, spread, news, daily loss and max loss must pass.</small>
+                </article>
+                <article>
+                  <span>03</span>
+                  <strong>Preview + approve live</strong>
+                  <small>MT5 bridge previews the order. User clicks Approve Live Order.</small>
+                </article>
+              </div>
+
+              <div class="bot-builder-layout">
+                <div class="bot-config-card">
+                  <div class="inputs-grid">
+                    <label>
+                      Bot name
+                      <input id="botName" type="text" value="Zeus Protected Live" />
+                    </label>
+                    <label>
+                      Market
+                      <select id="botMarket">
+                        <option value="crypto">Crypto majors</option>
+                        <option value="gold">Gold / XAUUSD</option>
+                        <option value="stocks">US large-cap stocks</option>
+                        <option value="indices">SPY / QQQ indices</option>
+                      </select>
+                    </label>
+                    <label>
+                      Base strategy
+                      <select id="botStrategy">
+                        <option value="vwap">VWAP reclaim + volume</option>
+                        <option value="ema">EMA momentum continuation</option>
+                        <option value="orb">Opening range breakout</option>
+                        <option value="riskpause">Tarot risk-pause only</option>
+                      </select>
+                    </label>
+                    <label>
+                      Audit window days
+                      <input id="botDemoDays" type="number" value="30" min="7" max="120" step="1" />
+                    </label>
+                    <label>
+                      Risk per trade %
+                      <input id="botRisk" type="number" value="0.35" min="0.05" max="1" step="0.05" />
+                    </label>
+                    <label>
+                      Execution mode
+                      <select id="botExecution">
+                        <option value="protected-live">Protected Live</option>
+                        <option value="live-preview">Live Preview</option>
+                        <option value="signals-only">Signals only</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="indicator-grid" aria-label="Bot indicators">
+                    <label><input class="bot-indicator" type="checkbox" value="EMA 9/21/50" checked /> EMA 9/21/50</label>
+                    <label><input class="bot-indicator" type="checkbox" value="VWAP" checked /> VWAP</label>
+                    <label><input class="bot-indicator" type="checkbox" value="RSI" checked /> RSI</label>
+                    <label><input class="bot-indicator" type="checkbox" value="MACD" checked /> MACD</label>
+                    <label><input class="bot-indicator" type="checkbox" value="ATR" checked /> ATR</label>
+                    <label><input class="bot-indicator" type="checkbox" value="Volume spike" checked /> Volume spike</label>
+                    <label><input class="bot-indicator" type="checkbox" value="Bollinger Bands" /> Bollinger Bands</label>
+                    <label><input class="bot-indicator" type="checkbox" value="Pattern detector" /> Pattern detector</label>
+                  </div>
+
+                  <div class="bot-actions">
+                    <button id="buildBotConfig" class="primary-action" type="button">Build Protected Config</button>
+                    <button id="scrollBotScanner" class="secondary-action" type="button">Use Live Scanner</button>
+                  </div>
+                </div>
+
+                <div class="bot-output-card">
+                  <div id="botWorkflow" class="bot-workflow"></div>
+                  <pre id="botConfigOutput" class="bot-config-output"></pre>
+                </div>
+              </div>
+
+              <div class="exchange-execution-shell">
+                <div class="exchange-execution-header">
+                  <div>
+                    <h3>MT5 Protected Live Execution</h3>
+                    <p>Dashboard sends preview and approved orders to a local/VPS MT5 bridge. Browser approval is required before submit.</p>
+                  </div>
+                  <span id="exchangeExecutionStatus" class="status-chip warning">MT5 Disconnected</span>
+                </div>
+
+                <div class="inputs-grid exchange-inputs">
+                  <label>
+                    Platform
+                    <select id="executionPlatform">
+                      <option value="mt5-bridge">MT5 Bridge</option>
+                      <option value="mexc-futures-testnet">MEXC Futures Testnet</option>
+                      <option value="binance-testnet">Binance Spot Testnet</option>
+                      <option value="kucoin-mock">KuCoin Mock</option>
+                      <option value="ftmo-custom">FTMO / Custom Challenge</option>
+                    </select>
+                  </label>
+                  <label>
+                    Mode
+                    <select id="executionModeSelect">
+                      <option value="protected-live">Protected Live</option>
+                      <option value="live-preview">Live Preview</option>
+                      <option value="manual-testnet">Manual approve testnet</option>
+                    </select>
+                  </label>
+                  <label>
+                    MT5 bridge URL
+                    <input id="mt5BridgeUrl" type="url" value="http://127.0.0.1:8789" />
+                  </label>
+                  <label>
+                    Symbol
+                    <input id="executionSymbol" type="text" value="XAUUSD" />
+                  </label>
+                  <label>
+                    Direction
+                    <select id="executionSide">
+                      <option value="LONG">LONG / BUY</option>
+                      <option value="SHORT">SHORT / SELL</option>
+                    </select>
+                  </label>
+                  <label>
+                    Entry limit
+                    <input id="executionEntry" type="number" value="78000" min="0" step="0.01" />
+                  </label>
+                  <label>
+                    Stop-loss
+                    <input id="executionStop" type="number" value="77500" min="0" step="0.01" />
+                  </label>
+                  <label>
+                    Target
+                    <input id="executionTarget" type="number" value="79000" min="0" step="0.01" />
+                  </label>
+                  <label>
+                    Daily P/L %
+                    <input id="executionDailyPnl" type="number" value="0" min="-6" max="6" step="0.05" />
+                  </label>
+                  <label>
+                    Consecutive losses
+                    <input id="executionLosses" type="number" value="0" min="0" max="10" step="1" />
+                  </label>
+                  <label>
+                    Journal note
+                    <input id="executionJournal" type="text" value="A+ setup only; SL and target are defined before approval." />
+                  </label>
+                </div>
+
+                <div class="exchange-actions">
+                  <button id="connectExchange" class="secondary-action" type="button">Connect</button>
+                  <button id="buildOrderPreview" class="primary-action" type="button">Build MT5 Preview</button>
+                  <button id="approveTestnetTrade" class="secondary-action" type="button" disabled>Approve Live Order</button>
+                  <button id="killSwitch" class="danger-action" type="button">Kill Switch</button>
+                </div>
+
+                <div class="exchange-status-grid">
+                  <pre id="exchangeOrderPreview" class="exchange-output">No order preview yet.</pre>
+                  <div id="exchangeStatusLog" class="exchange-log"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel active-agent-panel" data-panel="active-agent">
+              <div class="panel-header">
+                <div>
+                  <h2>Browser Trading Agent</h2>
+                  <p>Comet-style assistant for the user browser: it watches live workflow, reviews setup quality, guides MT5 bridge steps, and blocks unsafe execution.</p>
+                </div>
+                <span id="agentLoopState" class="status-chip safe">Research loop active</span>
+              </div>
+              <div class="browser-agent-strip">
+                <article>
+                  <span>Can do now</span>
+                  <strong>Analyze + guide</strong>
+                  <small>Runs OpenRouter review, explains blockers, and prepares MT5 order previews.</small>
+                </article>
+                <article>
+                  <span>Permission gate</span>
+                  <strong>Manual approval</strong>
+                  <small>User must approve protected live submits from the dashboard.</small>
+                </article>
+                <article class="locked">
+                  <span>Locked</span>
+                  <strong>Blind broker clicks</strong>
+                  <small>No password typing, no 2FA bypass, no hidden order clicks. MT5 bridge submits only after approval.</small>
+                </article>
+              </div>
+              <div class="agent-control-panel" aria-label="Registered user agent controls">
+                <label>
+                  User control
+                  <select id="agentControlMode">
+                    <option value="manual-approval">Manual approval required</option>
+                    <option value="preview-only">Preview and block only</option>
+                    <option value="journal-supervisor">Journal supervisor</option>
+                  </select>
+                </label>
+                <label class="approval-toggle">
+                  <input id="agentRequireApproval" type="checkbox" checked />
+                  <span>Require user click before any MT5 live submit</span>
+                </label>
+                <div class="agent-control-actions">
+                  <button id="runAgentChain" class="primary-action" type="button">Run Full Agent Chain</button>
+                  <button id="pauseAgentChain" class="secondary-action" type="button">Pause Agents</button>
+                </div>
+                <small id="agentControlStatus">Login/register to save agent control policy.</small>
+              </div>
+              <div class="agent-runtime-grid">
+                <div class="runtime-orbit" aria-label="Active agent status">
+                  <div class="runtime-core">
+                    <span id="agentHeartbeat">00:00</span>
+                    <strong>Zeus Agent</strong>
+                    <small>protected live / MT5 gate</small>
+                  </div>
+                  <div class="orbit-ring ring-one"></div>
+                  <div class="orbit-ring ring-two"></div>
+                  <div class="orbit-dot dot-one"></div>
+                  <div class="orbit-dot dot-two"></div>
+                </div>
+                <div class="runtime-main">
+                  <div id="activeAgentPipeline" class="active-agent-pipeline"></div>
+                  <div class="runtime-progress" aria-label="Agent loop progress">
+                    <span id="agentRuntimeBar"></span>
+                  </div>
+                  <div class="runtime-actions">
+                    <button id="agentPulseButton" class="secondary-action" type="button">Run One Cycle</button>
+                    <button id="browserAgentReview" class="primary-action" type="button">Run Free AI Agent</button>
+                    <span>Agent guides live workflow, but MT5 submit still requires manual approval and hard risk pass.</span>
+                  </div>
+                  <div id="agentCycleSummary" class="agent-cycle-summary">No backend agent cycle yet.</div>
+                  <div id="agentChainOutput" class="agent-chain-output"></div>
+                  <pre id="browserAgentOutput" class="browser-agent-output">Free agent route: OpenRouter model reviews the current protected live bot, challenge rules, risk settings, MT5 bridge status, and next browser action.</pre>
+                </div>
+              </div>
+              <div class="agent-log-shell">
+                <div class="agent-log-header">
+                  <strong>Live Process Log</strong>
+                  <span>refreshes every few seconds</span>
+                </div>
+                <div id="activeAgentLogs" class="active-agent-logs"></div>
+              </div>
+            </section>
+
+            <section class="panel tarot-panel tarot-stage-panel" data-panel="tarot">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Trading Tarot Risk Reading</h2>
+                  <p>Original Zeus card art inspired by tarot trading culture. This is a psychology/risk pause, never a signal.</p>
+                </div>
+                <button id="drawCards" class="secondary-action" type="button">Draw Cards</button>
+              </div>
+              <div id="tarotCards" class="tarot-cards tarot-premium-scene">
+                <div class="tradingview-tarot-stage"></div>
+                <div class="tarot-card-picker" aria-label="Open tarot card">
+                  <button type="button" data-tarot-card="0">Moon</button>
+                  <button type="button" data-tarot-card="1">Oracle</button>
+                  <button class="active" type="button" data-tarot-card="2">Balance</button>
+                  <button type="button" data-tarot-card="3">Tower</button>
+                  <button type="button" data-tarot-card="4">Sun</button>
+                </div>
+                <article class="tarot-reading-detail" id="tarotReadingDetail">
+                  <span>Selected card</span>
+                  <h3>The Balance</h3>
+                  <strong>Risk and position size</strong>
+                  <p>Open reading: position size must follow stop distance and daily loss limits. If the risk is not clear, there is no trade.</p>
+                  <small>Click any card, or press Draw Cards, to open a new reading.</small>
+                </article>
+              </div>
+              <p id="tarotSummary" class="tarot-summary">Cards are openable now. Click a card to open its reading, or use Draw Cards for a fresh risk pause.</p>
+            </section>
+
+            <section class="panel autonomy-panel" data-panel="autonomy">
+              <div class="panel-header">
+                <div>
+                  <h2>Can This Run Like OpenClaw?</h2>
+                  <p>Clear answer: the website agent can supervise protected live flow now; full browser autonomy stays permissioned and controlled.</p>
+                </div>
+                <span class="status-chip warning">Protected live</span>
+              </div>
+              <div class="autonomy-grid">
+                <article>
+                  <span>Works now</span>
+                  <strong>Strategy intelligence</strong>
+                  <p>Builds prop-firm playbooks, reviews setups with OpenRouter, checks risk rules, explains invalidation, and keeps a live audit workflow.</p>
+                </article>
+                <article>
+                  <span>Not enabled</span>
+                  <strong>Autonomous browser control</strong>
+                  <p>It does not type passwords, bypass 2FA, or blindly click broker order buttons. MT5 bridge submit requires dashboard approval.</p>
+                </article>
+                <article>
+                  <span>Safe upgrade path</span>
+                  <strong>Research agent runtime</strong>
+                  <p>A browser agent can gather news/ideas, summarize context, prepare plans, and submit only through protected MT5 approval flow.</p>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="dashboard">
+              <div class="panel-header">
+                <div>
+                  <h2>Account Guard</h2>
+                  <p>Prop-firm limits before trade selection.</p>
+                </div>
+                <span id="guardStatus" class="status-chip safe">Safe</span>
+              </div>
+
+              <div class="inputs-grid">
+                <label>
+                  Initial simulated capital
+                  <input id="initialCapital" type="number" value="100000" min="1000" step="1000" />
+                </label>
+                <label>
+                  Balance at 00:00 CE(S)T
+                  <input id="dayStartBalance" type="number" value="100000" min="0" step="100" />
+                </label>
+                <label>
+                  Current equity
+                  <input id="currentEquity" type="number" value="101850" min="0" step="100" />
+                  <small id="equityLiveNote" class="input-note">Live basket adjustment pending.</small>
+                </label>
+                <label>
+                  Planned risk per trade %
+                  <input id="riskPerTrade" type="number" value="0.35" min="0.05" max="3" step="0.05" />
+                </label>
+                <label>
+                  FundedElite phase
+                  <select id="challengePhase">
+                    <option value="evaluation">Evaluation / static DD</option>
+                    <option value="live">Live / trailing DD</option>
+                  </select>
+                </label>
+                <label>
+                  High-water equity
+                  <input id="highWaterEquity" type="number" value="101850" min="0" step="100" />
+                </label>
+                <label>
+                  Total profit
+                  <input id="totalProfit" type="number" value="1850" step="50" />
+                </label>
+                <label>
+                  Best day profit
+                  <input id="bestDayProfit" type="number" value="700" step="50" />
+                </label>
+                <label>
+                  Profitable days
+                  <input id="profitableDays" type="number" value="1" min="0" max="30" step="1" />
+                </label>
+              </div>
+
+              <div class="metric-grid">
+                <article class="metric-card">
+                  <span>Profit target</span>
+                  <strong id="profitTarget">$10,000</strong>
+                  <div class="progress-track">
+                    <div id="profitProgress" class="progress-fill green"></div>
+                  </div>
+                  <small id="profitProgressLabel">18.5% complete</small>
+                </article>
+                <article class="metric-card">
+                  <span>Daily loss buffer</span>
+                  <strong id="dailyBuffer">$6,850</strong>
+                  <div class="progress-track">
+                    <div id="dailyProgress" class="progress-fill teal"></div>
+                  </div>
+                  <small id="dailyLimitLabel">Limit: $95,000</small>
+                </article>
+                <article class="metric-card">
+                  <span>Maximum loss buffer</span>
+                  <strong id="maxBuffer">$11,850</strong>
+                  <div class="progress-track">
+                    <div id="maxProgress" class="progress-fill amber"></div>
+                  </div>
+                  <small id="maxLimitLabel">Limit: $90,000</small>
+                </article>
+                <article class="metric-card">
+                  <span>Max planned loss</span>
+                  <strong id="tradeRisk">$350</strong>
+                  <div class="risk-scale">
+                    <span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                  <small>Hard stop required before entry.</small>
+                </article>
+                <article class="metric-card">
+                  <span>Consistency status</span>
+                  <strong id="consistencyStatus">OK</strong>
+                  <small id="consistencyHelp">Best day <= 30% of total profit.</small>
+                </article>
+                <article class="metric-card">
+                  <span>Max next trade loss</span>
+                  <strong id="nextTradeLoss">$0</strong>
+                  <small id="nextTradeLossHelp">Based on remaining DD buffer.</small>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="scanner">
+              <div class="panel-header">
+                <div>
+                  <h2>Market Scanner</h2>
+                  <p>Live watchlist for volume spike, VWAP reclaim, breakout, continuation setups, and MT5-ready blockers.</p>
+                </div>
+                <button id="scanMarket" class="secondary-action" type="button">Run Scan</button>
+              </div>
+
+              <div class="pipeline-grid" id="pipelineGrid"></div>
+              <div id="scannerList" class="scanner-list"></div>
+            </section>
+
+            <section class="panel calendar-panel" data-panel="calendar">
+              <div class="panel-header">
+                <div>
+                  <h2>Economic Calendar + News Gate</h2>
+                  <p>High-impact macro, CPI/FOMC/NFP, platform risk and market shocks can block Protected Live previews.</p>
+                </div>
+                <button id="loadEconomicCalendar" class="secondary-action" type="button">Load Calendar</button>
+              </div>
+              <div class="calendar-controls">
+                <label>
+                  Focus
+                  <select id="calendarFocus">
+                    <option value="all">All high-impact markets</option>
+                    <option value="usd">USD / indices / gold</option>
+                    <option value="crypto">Crypto / BTC</option>
+                    <option value="eur">EUR / EURUSD</option>
+                  </select>
+                </label>
+                <label>
+                  News policy
+                  <select id="calendarPolicy">
+                    <option value="block-high">Block high-impact windows</option>
+                    <option value="preview-only">Preview only around events</option>
+                    <option value="journal-only">Journal warning only</option>
+                  </select>
+                </label>
+                <a class="secondary-action" href="https://www.investing.com/economic-calendar/" target="_blank" rel="noreferrer">Open Investing Calendar</a>
+              </div>
+              <div id="calendarSummary" class="prediction-summary">Calendar not loaded yet.</div>
+              <div id="economicCalendarList" class="economic-calendar-list"></div>
+            </section>
+
+            <section class="panel prediction-panel" data-panel="prediction">
+              <div class="panel-header">
+                <div>
+                  <h2>Prediction Market Intelligence</h2>
+                  <p>Oddpool/Polymarket probabilities feed News/Macro Risk only. They never create direct FTMO orders.</p>
+                </div>
+                <span id="predictionStatus" class="status-chip warning">Context only</span>
+              </div>
+              <div class="prediction-controls">
+                <label>
+                  Event search
+                  <input id="predictionQuery" type="text" value="fomc" />
+                </label>
+                <label>
+                  Source
+                  <select id="predictionSource">
+                    <option value="auto">Oddpool if configured, Polymarket fallback</option>
+                    <option value="polymarket">Polymarket public Gamma</option>
+                  </select>
+                </label>
+                <button id="loadPredictionMarkets" class="secondary-action" type="button">Load Odds Context</button>
+              </div>
+              <div id="predictionSummary" class="prediction-summary">No event odds loaded yet.</div>
+              <div id="predictionMarkets" class="prediction-market-grid"></div>
+              <div class="strategy-strip">
+                <article>
+                  <strong>FTMO macro shield</strong>
+                  <small>FOMC/CPI/NFP repricing can force preview-only or no-trade mode.</small>
+                </article>
+                <article>
+                  <strong>Sentiment divergence</strong>
+                  <small>Odds are context; chart setup, SL/TP and drawdown rules decide.</small>
+                </article>
+                <article>
+                  <strong>Polymarket paper-only</strong>
+                  <small>Odds momentum/arbitrage stay separate from MT5 prop-firm execution.</small>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel clob-panel" data-panel="clob-wallet">
+              <div class="panel-header">
+                <div>
+                  <h2>Wallet CLOB Terminal</h2>
+                  <p>Separate wallet/CLOB system for Phantom Terminal and Polymarket previews. It is not FTMO/MT5 execution.</p>
+                </div>
+                <span id="clobStatus" class="status-chip warning">Preview only</span>
+              </div>
+              <div class="clob-safety-banner">
+                <strong>Wallet safety</strong>
+                <span>No seed phrase, no private key, no hidden browser clicks. Any real CLOB order must be signed by you in your wallet.</span>
+              </div>
+              <div class="clob-compliance-grid">
+                <article>
+                  <strong>1. Compliance / geofence</strong>
+                  <small id="clobComplianceStatus">Not checked</small>
+                </article>
+                <article>
+                  <strong>2. Wallet connection</strong>
+                  <small id="clobWalletAddress">Not connected</small>
+                </article>
+                <article>
+                  <strong>3. Explicit wallet approval</strong>
+                  <small id="clobWalletApprovalStatus">Not signed</small>
+                </article>
+              </div>
+              <div class="clob-attestations">
+                <label>
+                  <input id="clobJurisdictionAttestation" type="checkbox" />
+                  I confirm this wallet/CLOB preview is legal in my jurisdiction.
+                </label>
+                <label>
+                  <input id="clobWalletRiskAcknowledgement" type="checkbox" />
+                  I understand this is separate from FTMO/MT5 and I keep custody of wallet keys.
+                </label>
+                <label>
+                  <input id="clobManualApprovalRequired" type="checkbox" checked />
+                  Require manual wallet approval/signature for every preview.
+                </label>
+              </div>
+              <div class="clob-actions">
+                <a class="primary-action" href="https://trade.phantom.com/?utm_source=extension_content_card" target="_blank" rel="noreferrer">Open Phantom Terminal</a>
+                <button id="runClobCompliance" class="secondary-action" type="button">Run Compliance Check</button>
+                <button id="connectPhantomWallet" class="secondary-action" type="button">Connect Wallet</button>
+                <button id="signClobApproval" class="secondary-action" type="button">Sign Preview Approval</button>
+                <button id="loadClobMarkets" class="secondary-action" type="button">Load Polymarket CLOB</button>
+                <button id="buildClobPreview" class="secondary-action" type="button">Build Wallet Preview</button>
+                <button id="submitClobLocked" class="danger-action" type="button">Submit Locked</button>
+              </div>
+              <div class="inputs-grid clob-inputs">
+                <label>
+                  Wallet route
+                  <select id="clobWalletProvider">
+                    <option value="phantom-terminal">Phantom Terminal</option>
+                    <option value="phantom-extension">Phantom extension manual</option>
+                    <option value="polymarket-web">Polymarket web manual</option>
+                    <option value="crypto-funding-profile">Profile wallet funding only</option>
+                  </select>
+                </label>
+                <label>
+                  Market URL
+                  <input id="clobMarketUrl" type="url" value="https://polymarket.com/" />
+                </label>
+                <label>
+                  CLOB token id
+                  <input id="clobTokenId" type="text" placeholder="Select from loaded CLOB market" />
+                </label>
+                <label>
+                  Outcome
+                  <select id="clobOutcome">
+                    <option>YES</option>
+                    <option>NO</option>
+                  </select>
+                </label>
+                <label>
+                  Side
+                  <select id="clobSide">
+                    <option>BUY</option>
+                    <option>SELL</option>
+                  </select>
+                </label>
+                <label>
+                  Limit price
+                  <input id="clobPrice" type="number" value="0.50" min="0.01" max="0.99" step="0.01" />
+                </label>
+                <label>
+                  Size / shares
+                  <input id="clobSize" type="number" value="5" min="1" step="1" />
+                </label>
+                <label>
+                  Max wallet spend
+                  <input id="clobMaxSpend" type="number" value="25" min="1" step="1" />
+                </label>
+              </div>
+              <div class="exchange-status-grid">
+                <div id="clobMarkets" class="exchange-log"></div>
+                <pre id="clobPreviewOutput" class="exchange-output">No CLOB/wallet preview yet.</pre>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="signal">
+              <div class="panel-header">
+                <div>
+                  <h2>Signal Preflight</h2>
+                  <p>Agent builds a trade plan only after news, technical, and risk gates agree.</p>
+                </div>
+                <span id="preflightStatus" class="status-chip warning">Needs check</span>
+              </div>
+
+              <div class="inputs-grid signal-inputs">
+                <label>
+                  Ticker
+                  <input id="signalTicker" type="text" value="AMD" />
+                </label>
+                <label>
+                  Direction
+                  <select id="signalDirection">
+                    <option>LONG</option>
+                    <option>SHORT</option>
+                  </select>
+                </label>
+                <label>
+                  Entry
+                  <input id="signalEntry" type="number" value="168.20" step="0.01" min="0" />
+                </label>
+                <label>
+                  Stop-loss
+                  <input id="signalStop" type="number" value="166.90" step="0.01" min="0" />
+                </label>
+                <label>
+                  Target
+                  <input id="signalTarget" type="number" value="170.80" step="0.01" min="0" />
+                </label>
+                <label>
+                  Relative volume
+                  <input id="signalVolume" type="number" value="2.1" step="0.1" min="0" />
+                </label>
+                <label>
+                  RSI
+                  <input id="signalRsi" type="number" value="58" step="1" min="0" max="100" />
+                </label>
+                <label>
+                  Spread %
+                  <input id="signalSpread" type="number" value="0.04" step="0.01" min="0" />
+                </label>
+                <label>
+                  News risk
+                  <select id="signalNews">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label>
+                  Trades today
+                  <input id="tradesToday" type="number" value="1" step="1" min="0" />
+                </label>
+                <label>
+                  Daily P/L
+                  <input id="dailyPnl" type="number" value="-20" step="10" />
+                </label>
+              </div>
+
+              <div class="preflight-layout">
+                <div id="signalOutput" class="signal-output"></div>
+                <div>
+                  <h3 class="mini-title">Hard Rules</h3>
+                  <div id="hardRules" class="rule-list"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="ideas">
+              <div class="panel-header">
+                <div>
+                  <h2>Research Queue</h2>
+                  <p>Forum and TradingView ideas are hypotheses, not orders.</p>
+                </div>
+                <div class="segmented" role="tablist" aria-label="Filter ideas">
+                  <button class="segment active" data-filter="all" type="button">All</button>
+                  <button class="segment" data-filter="xau" type="button">Gold</button>
+                  <button class="segment" data-filter="risk" type="button">Risk</button>
+                  <button class="segment" data-filter="education" type="button">Education</button>
+                </div>
+              </div>
+
+              <div id="ideaList" class="idea-list"></div>
+            </section>
+
+            <section class="split-panels">
+              <article class="panel" data-panel="strategy">
+                <div class="panel-header compact">
+                  <div>
+                    <h2>XAUUSD Strategy Lab</h2>
+                    <p>Confirmation checklist for a breakout or mean-reversion setup.</p>
+                  </div>
+                </div>
+                <div id="checklist" class="checklist"></div>
+                <div class="score-row">
+                  <div>
+                    <span>Validation score</span>
+                    <strong id="validationScore">0 / 7</strong>
+                  </div>
+                  <button id="resetChecklist" class="ghost-button" type="button">Reset</button>
+                </div>
+              </article>
+
+              <article class="panel" data-panel="risk">
+                <div class="panel-header compact">
+                  <div>
+                    <h2>Agent Algorithm</h2>
+                    <p>Strategy proposes, risk approves, AI explains, human confirms.</p>
+                  </div>
+                </div>
+                <ol class="algorithm-list">
+                  <li>Scanner finds volume spike, VWAP reclaim, breakout, or trend continuation.</li>
+                  <li>News filter blocks earnings, CPI, FOMC, NFP, SEC/regulatory shocks, and high-impact catalysts.</li>
+                  <li>Technical engine checks EMA 9/21/50, VWAP, RSI, MACD, ATR, volume average, and previous levels.</li>
+                  <li>Risk manager calculates stop, target, position size, daily loss buffer, spread, volatility, and R:R.</li>
+                  <li>AI explains the setup in plain language, including invalidation.</li>
+                  <li>MT5/manual confirm gate decides whether a protected live order can be sent.</li>
+                </ol>
+              </article>
+            </section>
+
+            <section class="panel" data-panel="backtest">
+              <div class="panel-header">
+                <div>
+                  <h2>Backtester</h2>
+                  <p>Historical evidence and audit stats for protected live decisions.</p>
+                </div>
+                <span class="status-chip warning">Sample metrics</span>
+              </div>
+              <div class="metric-grid compact-metrics">
+                <article class="metric-card">
+                  <span>Win rate</span>
+                  <strong id="btWinRate">45%</strong>
+                  <small>Not the main metric.</small>
+                </article>
+                <article class="metric-card">
+                  <span>Expectancy</span>
+                  <strong id="btExpectancy">+$21</strong>
+                  <small>Per trade estimate.</small>
+                </article>
+                <article class="metric-card">
+                  <span>Profit factor</span>
+                  <strong id="btProfitFactor">1.64</strong>
+                  <small>Gross win / gross loss.</small>
+                </article>
+                <article class="metric-card">
+                  <span>Max drawdown</span>
+                  <strong id="btDrawdown">-4.2%</strong>
+                  <small>Needs stress testing.</small>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="journal">
+              <div class="panel-header">
+                <div>
+                  <h2>Trade Journal</h2>
+                  <p>Write the reason before the trade exists.</p>
+                </div>
+                <button id="addJournal" class="secondary-action" type="button">Add Note</button>
+              </div>
+              <textarea id="journalText" rows="4" placeholder="Example: XAUUSD H1 liquidity sweep near resistance. I will only act after close confirmation and fixed SL."></textarea>
+              <div id="journalEntries" class="journal-entries"></div>
+            </section>
+          </div>
+
+          <aside class="right-column">
+            <section class="panel auth-panel" data-panel="profile">
+              <div class="panel-header compact">
+                <div>
+                  <h2>User Profile</h2>
+                  <p>Save bot settings, execution mode, and risk defaults.</p>
+                </div>
+                <span id="authStatus" class="status-chip warning">Guest</span>
+              </div>
+
+              <div class="auth-layout compact-auth">
+                <form id="authForm" class="auth-card">
+                  <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+                    <button class="active" type="button" data-auth-mode="login">Login</button>
+                    <button type="button" data-auth-mode="register">Register</button>
+                  </div>
+                  <label>
+                    Name
+                    <input id="authName" type="text" autocomplete="name" value="Zeus Trader" />
+                  </label>
+                  <label>
+                    Email
+                    <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+                  </label>
+                  <label>
+                    Password
+                    <input id="authPassword" type="password" autocomplete="current-password" placeholder="minimum 8 characters" />
+                  </label>
+                  <div class="auth-actions">
+                    <button id="authSubmit" class="primary-action" type="submit">Login</button>
+                    <button id="authLogout" class="secondary-action" type="button">Logout</button>
+                  </div>
+                  <small id="authMessage">Secure session uses an HttpOnly cookie.</small>
+                </form>
+
+                <div class="profile-card">
+                  <span>Active profile</span>
+                  <h3 id="profileName">Guest trader</h3>
+                  <p id="profileEmail">Not logged in.</p>
+                  <div class="profile-grid">
+                    <article>
+                      <strong id="profilePlatform">MT5 Bridge</strong>
+                      <small>Execution route</small>
+                    </article>
+                    <article>
+                      <strong id="profileRisk">0.25%</strong>
+                      <small>Risk lane</small>
+                    </article>
+                    <article>
+                      <strong id="profileLive">Protected</strong>
+                      <small>Live capability</small>
+                    </article>
+                    <article>
+                      <strong id="profileWalletStatus">No wallet</strong>
+                      <small>Funding wallet</small>
+                    </article>
+                  </div>
+                  <div class="wallet-profile-fields">
+                    <label>
+                      Wallet label
+                      <input id="profileWalletLabel" type="text" value="Primary crypto wallet" />
+                    </label>
+                    <label>
+                      Public wallet address
+                      <input id="profileWalletAddress" type="text" placeholder="Public address only, never seed phrase" />
+                    </label>
+                    <label>
+                      Funding mode
+                      <select id="profileFundingMode">
+                        <option value="manual-approve">Manual wallet approval only</option>
+                        <option value="preview-only">Preview only</option>
+                        <option value="disabled">Disabled</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button id="saveProfile" class="secondary-action" type="button">Save Bot Settings</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="sentiment">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Forum Sentiment</h2>
+                  <p>Useful for questions, dangerous as confirmation bias.</p>
+                </div>
+              </div>
+              <div class="sentiment-row">
+                <span>Risk management threads</span>
+                <strong>High value</strong>
+              </div>
+              <div class="sentiment-row">
+                <span>100% win-rate claims</span>
+                <strong class="danger">Ignore</strong>
+              </div>
+              <div class="sentiment-row">
+                <span>Prop firm rules</span>
+                <strong>Verify source</strong>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="execution">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Execution Gate</h2>
+                  <p>Orders require protected live preview, manual approval, and journal audit.</p>
+                </div>
+                <span id="executionMode" class="status-chip warning">Protected Live</span>
+              </div>
+              <div id="liveGuard" class="live-guard"></div>
+              <div class="execution-steps" id="executionSteps"></div>
+            </section>
+
+            <section class="panel" data-panel="readiness">
+              <div class="panel-header compact">
+                <div>
+                  <h2>System Readiness</h2>
+                  <p>What is wired, connected, protected, or blocked.</p>
+                </div>
+              </div>
+              <div id="readinessList" class="readiness-list"></div>
+            </section>
+
+            <section class="panel" data-panel="workflow">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Daily Workflow</h2>
+                  <p>Premarket, live scan, close review.</p>
+                </div>
+              </div>
+              <div class="workflow-list">
+                <article>
+                  <strong>Premarket</strong>
+                  <span>Watchlist, gap/volume, earnings/macro calendar, spread filter, top 5 plan.</span>
+                </article>
+                <article>
+                  <strong>Market hours</strong>
+                  <span>Scan every 1-5 min, calculate entry/SL/targets, risk gate, MT5 preview, manual confirm.</span>
+                </article>
+                <article>
+                  <strong>Close</strong>
+                  <span>Save signals and trades, compute P/L, violations, expectancy, and daily review.</span>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="education">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Learning Stack</h2>
+                  <p>Sources to read before automating.</p>
+                </div>
+              </div>
+              <div class="source-list">
+                <a href="https://www.myfxbook.com/community" target="_blank" rel="noreferrer">Myfxbook Community</a>
+                <a href="https://www.tradingview.com/ideas/" target="_blank" rel="noreferrer">TradingView Ideas</a>
+                <a href="https://www.tradingview.com/students/" target="_blank" rel="noreferrer">TradingView Students</a>
+                <a href="https://www.investopedia.com/" target="_blank" rel="noreferrer">Investopedia</a>
+                <a href="https://www.investing.com/economic-calendar/" target="_blank" rel="noreferrer">Investing Economic Calendar</a>
+                <a href="https://www.cmegroup.com/" target="_blank" rel="noreferrer">CME Group</a>
+                <a href="https://www.octobot.cloud/explore" target="_blank" rel="noreferrer">OctoBot Explore</a>
+                <a href="https://www.pionex.com/en/trade/BTC_USDT/Bot" target="_blank" rel="noreferrer">Pionex BTC/USDT Bot</a>
+                <a href="https://agentscope.io/" target="_blank" rel="noreferrer">AgentScope</a>
+                <a href="https://docs.agentscope.io/basic-concepts/agent" target="_blank" rel="noreferrer">AgentScope Docs</a>
+                <a href="https://console.apibricks.io/team/54a30dc6-46dc-4dac-93a7-72ad3f4288ee" target="_blank" rel="noreferrer">APIBricks Console</a>
+                <a href="https://www.apibricks.io/platform/docs/customer-portal/billing" target="_blank" rel="noreferrer">APIBricks Docs</a>
+                <a href="https://coinmarketcap.com/api/agent/" target="_blank" rel="noreferrer">CoinMarketCap for Agent</a>
+                <a href="https://coinmarketcap.com/api/skills-marketplace/" target="_blank" rel="noreferrer">CMC Skills Marketplace</a>
+                <a href="https://app.3commas.io/d" target="_blank" rel="noreferrer">3Commas Dashboard</a>
+                <a href="https://futures.testnet.mexc.com/futures/BTC_USDT" target="_blank" rel="noreferrer">MEXC Futures Testnet</a>
+                <a href="https://faq.fundedelite.com/en/articles/12683940-flash-activation-challenge" target="_blank" rel="noreferrer">FundedElite Flash FAQ</a>
+                <a href="https://ftmo.com/en/trading-objectives/" target="_blank" rel="noreferrer">FTMO Objectives</a>
+                <a href="https://www.metatrader5.com/" target="_blank" rel="noreferrer">MetaTrader 5</a>
+                <a href="https://ibkrcampus.com/campus/ibkr-api-page/twsapi-doc/" target="_blank" rel="noreferrer">IBKR TWS API</a>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <aside id="agentDock" class="agent-dock" aria-label="Agent console">
+      <div class="agent-dock-header">
+        <div>
+          <span>Agent Console</span>
+          <strong>Live browser control log</strong>
+        </div>
+        <button id="agentDockToggle" type="button">Open</button>
+      </div>
+      <div class="agent-dock-body">
+        <div id="agentDockLog" class="agent-dock-log"></div>
+        <form id="agentDockForm" class="agent-dock-form">
+          <input id="agentDockInput" type="text" placeholder="Ask agent what to do next..." />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js?v=20260525-live-desk-1"></script>
+  </body>
+</html>

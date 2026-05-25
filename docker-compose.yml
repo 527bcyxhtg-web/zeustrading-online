@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - trading-agent-data:/data
+    restart: unless-stopped
+
+volumes:
+  trading-agent-data:

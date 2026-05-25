@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zeus Agent Chat</title>
+    <link rel="stylesheet" href="/styles.css?v=20260521-agent-console-2" />
+    <style>
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+
+      .chat-shell {
+        width: min(980px, 100%);
+        border: 1px solid rgba(37, 199, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(6, 8, 9, 0.88);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .chat-head,
+      .chat-row,
+      .chat-actions {
+        padding: 16px;
+      }
+
+      .chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: linear-gradient(135deg, rgba(37, 199, 255, 0.16), rgba(217, 255, 55, 0.08));
+      }
+
+      .chat-head span,
+      .chat-head strong,
+      .chat-row strong,
+      .chat-row small {
+        display: block;
+      }
+
+      .chat-head span {
+        color: var(--lime);
+        font-size: 11px;
+        font-weight: 950;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chat-head strong {
+        color: var(--ink);
+        font-size: clamp(24px, 4vw, 46px);
+      }
+
+      .chat-log {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .chat-row {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .chat-row strong {
+        color: var(--ink);
+      }
+
+      .chat-row small {
+        margin-top: 6px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .chat-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      @media (max-width: 700px) {
+        .chat-head,
+        .chat-actions {
+          grid-template-columns: 1fr;
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="chat-shell">
+      <header class="chat-head">
+        <div>
+          <span id="sessionLabel">agent:main:main</span>
+          <strong>Zeus Browser Agent</strong>
+        </div>
+        <a class="secondary-action" href="/">Back to Cockpit</a>
+      </header>
+      <section id="chatLog" class="chat-log" aria-live="polite">
+        <article class="chat-row">
+          <strong>Agent ready</strong>
+          <small>I can guide the registered user through challenge rules, scanner review, risk gate, MT5 preview, manual approval, and journal. I cannot type broker passwords, bypass 2FA, or blindly click live orders.</small>
+        </article>
+      </section>
+      <form id="chatForm" class="chat-actions">
+        <input id="chatInput" type="text" placeholder="Ask: što je sljedeći siguran korak?" autocomplete="off" />
+        <button class="secondary-action" type="button" id="runChain">Run Agent Chain</button>
+        <button class="primary-action" type="submit">Send</button>
+      </form>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const session = params.get("session") || "agent:main:main";
+      document.querySelector("#sessionLabel").textContent = session;
+      const log = document.querySelector("#chatLog");
+      const input = document.querySelector("#chatInput");
+
+      function addRow(title, text) {
+        const row = document.createElement("article");
+        row.className = "chat-row";
+        row.innerHTML = `<strong>${title}</strong><small>${text}</small>`;
+        log.prepend(row);
+      }
+
+      document.querySelector("#runChain").addEventListener("click", () => {
+        addRow("Agent chain started", "1 User Control -> 2 Challenge Rules -> 3 Market Scanner -> 4 Indicator Agent -> 5 News/Risk -> 6 MT5 Preview -> 7 Manual Approve -> 8 Journal.");
+      });
+
+      document.querySelector("#chatForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        addRow("User", text);
+        addRow("Agent", "Next safe step: open the cockpit, select FundedElite/FTMO rules, run the risk gate, build MT5 preview, and approve only if every blocker is green.");
+        input.value = "";
+      });
+    </script>
+  </body>
+</html>

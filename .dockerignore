@@ -1,0 +1,12 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.sqlite3
+*.db
+database/*.sqlite3
+assets/
+tests/
+public/
+.git/
+.DS_Store

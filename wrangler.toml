@@ -1,0 +1,8 @@
+name = "zeustrading-online"
+pages_build_output_dir = "public"
+compatibility_date = "2026-05-20"
+
+[[d1_databases]]
+binding = "zeustrading_users"
+database_name = "zeustrading-users"
+database_id = "8c630b2d-9450-4455-84c9-6c4754e3792d"
