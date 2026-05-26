@@ -5,10 +5,7 @@ Local/VPS bridge for protected live MT5 execution.
 ## Run
 
 ```bash
-python3 -m venv .venv-mt5
-source .venv-mt5/bin/activate
-pip install -r mt5_bridge/requirements.txt
-uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
+./scripts/start_mt5_bridge.sh
 ```
 
 Dashboard URL:
@@ -23,10 +20,8 @@ By default the bridge is safe: it previews and journals but will not submit live
 
 To enable real MT5 order routing on a machine with MetaTrader 5 open and logged in:
 
-```bash
-export MT5_ENABLE_LIVE=true
-export MT5_REQUIRE_TERMINAL=true
-uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start_mt5_bridge_live_windows.ps1
 ```
 
 Hard rules stay enforced by the dashboard and bridge:
@@ -38,4 +33,3 @@ Hard rules stay enforced by the dashboard and bridge:
 - spread cap checked
 - kill switch route available
 - every preview/submit/flatten action is journaled
-
