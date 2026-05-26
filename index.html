@@ -241,6 +241,77 @@
           </div>
         </section>
 
+        <section class="zeus-control-center" data-panel="control-center" aria-label="Zeus control center">
+          <div class="control-hero">
+            <div>
+              <span class="eyebrow">Admin + Live Intelligence</span>
+              <h2>Zeus Control Center</h2>
+              <p>Jedan jasan redoslijed: registracija, admin profil, live cijene, vijesti, economic calendar, strategija, risk gate, MT5/Polymarket preview.</p>
+            </div>
+            <div class="control-hero-actions">
+              <button class="primary-action quick-jump" type="button" data-quick-target="profile">Login / Register</button>
+              <button id="refreshCommandCenter" class="secondary-action" type="button">Refresh Center</button>
+            </div>
+          </div>
+
+          <div class="control-center-grid">
+            <article class="admin-console-card">
+              <div class="card-title-row">
+                <span>Admin</span>
+                <strong id="adminConsoleStatus">Guest setup</strong>
+              </div>
+              <div id="adminDashboard" class="admin-dashboard"></div>
+              <button id="adminSaveShortcut" class="secondary-action" type="button">Save Admin Profile</button>
+            </article>
+
+            <article class="market-board-card">
+              <div class="card-title-row">
+                <span>Live Prices</span>
+                <strong id="marketBoardStatus">Loading</strong>
+              </div>
+              <div id="quickMarketBoard" class="quick-market-board"></div>
+            </article>
+
+            <article class="agent-chat-card">
+              <div class="card-title-row">
+                <span>Functional Chat</span>
+                <strong>Agent desk</strong>
+              </div>
+              <p>Chat koristi isti protected-live kontekst: challenge rules, scanner, calendar, MT5 bridge i journal. Ne šalje naloge bez risk gatea i user approvala.</p>
+              <div class="chat-shortcuts">
+                <button class="secondary-action" type="button" data-chat-prompt="Analyze FTMO XAUUSD setup with today's news blockers.">FTMO setup</button>
+                <button class="secondary-action" type="button" data-chat-prompt="Review Polymarket context as macro risk only, not a signal.">Polymarket risk</button>
+                <button class="secondary-action" type="button" data-chat-prompt="Explain why this trade should be blocked or preview-only.">Block/approve</button>
+              </div>
+              <a class="primary-action chat-open-button" href="/chat/?session=agent%3Amain%3Amain">Open Full Chat</a>
+            </article>
+          </div>
+
+          <div class="live-intel-grid">
+            <section class="intel-panel news-intel-panel">
+              <div class="panel-header compact">
+                <div>
+                  <h3>Market News With Images</h3>
+                  <p>InsiderWave-style risk feed: catalysts, sentiment, and blockers. Vijesti su kontekst, ne signal.</p>
+                </div>
+                <button id="loadNewsFeed" class="secondary-action" type="button">Refresh News</button>
+              </div>
+              <div id="newsImageGrid" class="news-image-grid"></div>
+            </section>
+
+            <section class="intel-panel strategy-library-panel">
+              <div class="panel-header compact">
+                <div>
+                  <h3>Strategy Library</h3>
+                  <p>Izaberi playbook. Agent smije pripremiti setup, ali execution mora proći risk gate.</p>
+                </div>
+                <span class="status-chip safe">Multi-strategy</span>
+              </div>
+              <div id="strategyLibrary" class="strategy-library"></div>
+            </section>
+          </div>
+        </section>
+
         <section class="content-grid">
           <div class="main-column">
             <section class="panel command-panel" data-panel="command">

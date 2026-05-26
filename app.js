@@ -344,6 +344,93 @@ const cmcSkillSeeds = [
   ["API Integration", "REST-style cryptocurrency, DEX, exchange and market data endpoints for custom apps."],
 ];
 
+const newsFallback = [
+  {
+    title: "Macro calendar risk window",
+    source: "Zeus Risk Desk",
+    category: "Macro",
+    summary: "High-impact CPI, FOMC, NFP and rate events can widen spreads. The agent should switch to wait/block near these windows.",
+    url: "https://www.investing.com/economic-calendar/",
+    image: "https://images.unsplash.com/photo-1642790106117-e829e14a795f?auto=format&fit=crop&w=900&q=80",
+    risk: "high",
+  },
+  {
+    title: "Gold and USD sensitivity",
+    source: "InsiderWave-style catalyst",
+    category: "Forex / Gold",
+    summary: "XAUUSD setups need USD, yields and event-risk context before any FTMO-style preview.",
+    url: "https://www.investing.com/",
+    image: "https://images.unsplash.com/photo-1610375461246-83df859d849d?auto=format&fit=crop&w=900&q=80",
+    risk: "medium",
+  },
+  {
+    title: "Crypto liquidity and venue risk",
+    source: "Crypto market desk",
+    category: "Crypto",
+    summary: "BTC/ETH momentum can help context, but wallet/CLOB execution stays separate from MT5 prop-firm trading.",
+    url: "https://coinmarketcap.com/",
+    image: "https://images.unsplash.com/photo-1621504450181-5d356f61d307?auto=format&fit=crop&w=900&q=80",
+    risk: "medium",
+  },
+  {
+    title: "Prediction markets as context only",
+    source: "Polymarket context",
+    category: "Polymarket",
+    summary: "Event odds can reveal crowd expectations, but Zeus treats them as news context, never as direct order signals.",
+    url: "https://polymarket.com/",
+    image: "https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&fit=crop&w=900&q=80",
+    risk: "low",
+  },
+];
+
+const strategyLibrarySeeds = [
+  {
+    id: "ftmo-survival",
+    title: "FTMO Challenge Survival",
+    badge: "FTMO",
+    use: "Pass-style risk discipline",
+    rule: "0.25%-0.5% risk, 1-2 A+ trades, stop after daily drawdown pressure.",
+    indicators: "EMA 9/21/50, VWAP, ATR, RSI, macro calendar",
+    target: "Slow progress, protect account, consistency first.",
+  },
+  {
+    id: "gold-session",
+    title: "XAUUSD Session Playbook",
+    badge: "Gold",
+    use: "London/New York volatility",
+    rule: "No trade around CPI/FOMC/NFP; require clean structure and fixed SL.",
+    indicators: "VWAP, previous day high/low, ATR, volume spike",
+    target: "1.5R-2R only when spread and macro risk allow.",
+  },
+  {
+    id: "vwap-momentum",
+    title: "VWAP Reclaim Momentum",
+    badge: "Stocks",
+    use: "NVDA/AMD/TSLA/SPY/QQQ candidates",
+    rule: "Close back above VWAP, EMA confirmation, RVOL >= 1.5x.",
+    indicators: "VWAP, EMA 9/21, RSI 45-70, relative volume",
+    target: "Candidate only until risk gate builds preview.",
+  },
+  {
+    id: "polymarket-event",
+    title: "Polymarket Event Trading",
+    badge: "CLOB",
+    use: "Wallet-approved event positions",
+    rule: "Compliance/geofence, wallet signature, no seed phrase, CLOB separate from FTMO.",
+    indicators: "Orderbook, liquidity, odds drift, event resolution risk",
+    target: "Preview and audit first; live submit stays locked unless adapter is approved.",
+  },
+  {
+    id: "crypto-bot",
+    title: "Crypto Bot Route",
+    badge: "Crypto",
+    use: "Pionex/3Commas/MEXC testnet research",
+    rule: "No withdrawal API keys, testnet before live, risk caps and journal.",
+    indicators: "Trend, volatility, funding, exchange liquidity, BTC dominance",
+    target: "Connector preview only until backend secret and approval flow exist.",
+  },
+];
+
 const guidedFlowSteps = [
   {
     id: "profile",
@@ -614,6 +701,11 @@ const state = {
     source: "local protected fallback",
     updatedAt: null,
     riskLevel: "medium",
+  },
+  news: {
+    items: newsFallback,
+    source: "fallback",
+    updatedAt: null,
   },
   botConnectors: {
     connectors: botConnectorSeeds,
@@ -1139,7 +1231,34 @@ function renderTickerTape() {
       `;
     })
     .join("");
+  renderQuickMarketBoard(items);
   renderPremiumChart();
+}
+
+function renderQuickMarketBoard(items = null) {
+  const board = $("#quickMarketBoard");
+  if (!board) return;
+  const assets =
+    items ||
+    ["BTC", "ETH", "SOL", "GOLD", "EURUSD", "SPY", "QQQ", "NVDA"]
+      .map((symbol) => getMarketAsset(symbol))
+      .filter(Boolean);
+  $("#marketBoardStatus").textContent = state.market.status === "live" ? "Live feed" : state.market.status === "degraded" ? "Guarded fallback" : "Loading";
+  board.innerHTML = assets.length
+    ? assets
+        .slice(0, 8)
+        .map((asset) => {
+          const down = asset.change < 0;
+          return `
+            <button class="market-tile ${down ? "down" : "up"}" type="button" data-market-symbol="${asset.symbol}">
+              <span>${asset.label}</span>
+              <strong>${formatMarketPrice(asset)}</strong>
+              <small>${formatMarketChange(asset.change)} · ${asset.source}</small>
+            </button>
+          `;
+        })
+        .join("")
+    : `<article class="market-tile"><span>Waiting</span><strong>Market feed</strong><small>Click Refresh Center.</small></article>`;
 }
 
 function simulateAsset(asset) {
@@ -1391,6 +1510,106 @@ function renderEconomicCalendar(data = null) {
         })
         .join("")
     : `<article class="calendar-event-card warn"><time>Manual</time><div><strong>No events matched this focus.</strong><small>Open Investing calendar and journal your no-news decision.</small></div><span class="impact-pill medium">check</span></article>`;
+}
+
+function riskLabelClass(risk = "medium") {
+  const value = String(risk).toLowerCase();
+  if (value === "high") return "danger";
+  if (value === "low") return "safe";
+  return "warning";
+}
+
+function renderNewsFeed(data = null) {
+  const grid = $("#newsImageGrid");
+  if (!grid) return;
+  const context = data || state.news;
+  const items = context.items || newsFallback;
+  grid.innerHTML = items
+    .slice(0, 6)
+    .map(
+      (item) => `
+        <article class="news-image-card ${riskLabelClass(item.risk)}">
+          <a href="${item.url || "https://www.investing.com/"}" target="_blank" rel="noreferrer">
+            <img src="${item.image || newsFallback[0].image}" alt="${item.category || "Market"} news image" loading="lazy" />
+            <span>${item.source || "Market feed"}</span>
+          </a>
+          <div>
+            <strong>${item.title}</strong>
+            <p>${item.summary || "Use as protected news context before any trade preview."}</p>
+            <small>${item.category || "Market"} · risk ${item.risk || "medium"}</small>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+async function loadNewsFeed() {
+  try {
+    const response = await fetch("/api/news-feed", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "News feed unavailable.");
+    state.news = {
+      items: data.items || newsFallback,
+      source: data.source || "news proxy",
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+    };
+    renderNewsFeed(state.news);
+    agentConsoleLog("News feed", `${state.news.source}: ${state.news.items.length} items loaded.`);
+  } catch (error) {
+    state.news = { items: newsFallback, source: `fallback (${error.message})`, updatedAt: new Date() };
+    renderNewsFeed(state.news);
+    agentConsoleLog("News fallback", error.message);
+  }
+}
+
+function renderStrategyLibrary() {
+  const grid = $("#strategyLibrary");
+  if (!grid) return;
+  grid.innerHTML = strategyLibrarySeeds
+    .map(
+      (strategy) => `
+        <article class="strategy-library-card" data-strategy-card="${strategy.id}">
+          <span>${strategy.badge}</span>
+          <strong>${strategy.title}</strong>
+          <p>${strategy.use}</p>
+          <small><b>Rule:</b> ${strategy.rule}</small>
+          <small><b>Indicators:</b> ${strategy.indicators}</small>
+          <button class="secondary-action" type="button" data-strategy-select="${strategy.id}">Use Strategy</button>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderAdminDashboard() {
+  const admin = $("#adminDashboard");
+  if (!admin) return;
+  const loggedIn = Boolean(state.user);
+  const botProfile = state.user?.profile?.botProfile || botProfileFromInputs();
+  $("#adminConsoleStatus").textContent = loggedIn ? "Admin profile active" : "Register to unlock admin";
+  admin.innerHTML = `
+    <div class="admin-kpi ${loggedIn ? "ready" : "warn"}">
+      <span>User</span>
+      <strong>${loggedIn ? state.user.name : "Guest"}</strong>
+      <small>${loggedIn ? state.user.email : "No saved profile yet"}</small>
+    </div>
+    <div class="admin-kpi">
+      <span>Mode</span>
+      <strong>${botProfile.mode || $("#executionModeSelect")?.value || "protected-live"}</strong>
+      <small>Manual approval is required for live submit.</small>
+    </div>
+    <div class="admin-kpi">
+      <span>Risk</span>
+      <strong>${Number(botProfile.riskPercent || numberValue("#botRisk") || 0.25).toFixed(2)}%</strong>
+      <small>Default per trade risk cap.</small>
+    </div>
+    <div class="admin-kpi">
+      <span>Bridge</span>
+      <strong>${state.exchange.mt5Connected ? "Connected" : "Local check"}</strong>
+      <small>${$("#mt5BridgeUrl")?.value || "http://127.0.0.1:8789"}</small>
+    </div>
+  `;
 }
 
 function renderBotConnectors(data = null) {
@@ -2005,6 +2224,7 @@ function applyUserProfile(user) {
   if (wallet.fundingMode && $("#profileFundingMode")) $("#profileFundingMode").value = wallet.fundingMode;
   buildBotConfig();
   renderAgentControlStatus();
+  renderAdminDashboard();
 }
 
 async function loadCurrentUser() {
@@ -3399,7 +3619,72 @@ function bindEvents() {
   $("#refreshLiveDesk")?.addEventListener("click", () => {
     marketData.refresh();
     loadEconomicCalendar();
+    loadNewsFeed();
+    renderAdminDashboard();
     showToast("Live desk refreshed: chart, scanner and calendar.");
+  });
+
+  $("#refreshCommandCenter")?.addEventListener("click", () => {
+    marketData.refresh();
+    loadEconomicCalendar();
+    loadNewsFeed();
+    renderStrategyLibrary();
+    renderAdminDashboard();
+    showToast("Control Center refreshed.");
+  });
+
+  $("#adminSaveShortcut")?.addEventListener("click", () => {
+    const target = document.querySelector('[data-panel="profile"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    saveProfileSettings();
+  });
+
+  $("#loadNewsFeed")?.addEventListener("click", loadNewsFeed);
+
+  $("#quickMarketBoard")?.addEventListener("click", (event) => {
+    const tile = event.target.closest("[data-market-symbol]");
+    if (!tile) return;
+    const asset = getMarketAsset(tile.dataset.marketSymbol);
+    if (!asset) return;
+    const selectValue = asset.label === "XAUUSD" ? "XAUUSD" : asset.label === "BTCUSD" ? "BTCUSD" : asset.symbol;
+    if (selectHasValue("#symbolSelect", selectValue)) $("#symbolSelect").value = selectValue;
+    renderPremiumChart();
+    buildSignal();
+    showToast(`${asset.label} opened in chart.`);
+  });
+
+  $("#strategyLibrary")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-strategy-select]");
+    if (!button) return;
+    const id = button.dataset.strategySelect;
+    const map = {
+      "ftmo-survival": "trend",
+      "gold-session": "vwap",
+      "vwap-momentum": "vwap",
+      "polymarket-event": "riskpause",
+      "crypto-bot": "ema",
+    };
+    if (selectHasValue("#botStrategy", map[id])) $("#botStrategy").value = map[id];
+    if (id === "polymarket-event") {
+      const target = document.querySelector('[data-panel="clob-wallet"]');
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      buildBotConfig();
+      const target = document.querySelector('[data-panel="bot-builder"]');
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    showToast("Strategy selected for protected builder.");
+  });
+
+  $$(".chat-shortcuts [data-chat-prompt]").forEach((button) => {
+    button.addEventListener("click", () => {
+      $("#agentDock")?.classList.add("open");
+      if ($("#agentDockToggle")) $("#agentDockToggle").textContent = "Close";
+      const prompt = button.dataset.chatPrompt;
+      $("#agentDockInput").value = prompt;
+      agentConsoleLog("Chat prompt loaded", prompt);
+      showToast("Prompt loaded in agent chat.");
+    });
   });
 
   $("#guidedFlowSteps")?.addEventListener("click", (event) => {
@@ -3583,9 +3868,13 @@ bootStep("pipeline", renderPipeline);
 bootStep("market status", updateMarketStatus);
 bootStep("premium chart cockpit", renderPremiumChart);
 bootStep("ticker", renderTickerTape);
+bootStep("market board", renderQuickMarketBoard);
 bootStep("scanner", renderScanner);
 bootStep("prediction markets", renderPredictionMarkets);
 bootStep("economic calendar", renderEconomicCalendar);
+bootStep("news feed", renderNewsFeed);
+bootStep("strategy library", renderStrategyLibrary);
+bootStep("admin dashboard", renderAdminDashboard);
 bootStep("guided flow", renderGuidedFlow);
 bootStep("bot connectors", renderBotConnectors);
 bootStep("clob terminal", renderClobMarkets);
@@ -3604,4 +3893,5 @@ bootStep("readiness", renderReadiness);
 bootStep("signal", buildSignal);
 bootStep("market data", () => marketData.start());
 bootStep("calendar data", loadEconomicCalendar);
+bootStep("news data", loadNewsFeed);
 bootStep("bot connector data", loadBotConnectors);

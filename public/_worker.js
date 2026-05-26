@@ -68,6 +68,51 @@ const CALENDAR_FALLBACK = [
     action: "Open Investing economic calendar and journal the decision.",
   },
 ];
+const NEWS_IMAGES = {
+  macro: "https://images.unsplash.com/photo-1642790106117-e829e14a795f?auto=format&fit=crop&w=900&q=80",
+  forex: "https://images.unsplash.com/photo-1610375461246-83df859d849d?auto=format&fit=crop&w=900&q=80",
+  crypto: "https://images.unsplash.com/photo-1621504450181-5d356f61d307?auto=format&fit=crop&w=900&q=80",
+  polymarket: "https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&fit=crop&w=900&q=80",
+  stocks: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=900&q=80",
+};
+const NEWS_FALLBACK = [
+  {
+    title: "Macro calendar risk window",
+    source: "Zeus Risk Desk",
+    category: "Macro",
+    summary: "CPI, FOMC, NFP and rate decisions can widen spreads. The agent should block or wait near high-impact windows.",
+    url: "https://www.investing.com/economic-calendar/",
+    image: NEWS_IMAGES.macro,
+    risk: "high",
+  },
+  {
+    title: "Gold and USD sensitivity",
+    source: "InsiderWave-style catalyst",
+    category: "Forex / Gold",
+    summary: "XAUUSD needs USD, yields and event-risk context before any FTMO-style preview.",
+    url: "https://www.investing.com/",
+    image: NEWS_IMAGES.forex,
+    risk: "medium",
+  },
+  {
+    title: "Crypto liquidity and venue risk",
+    source: "Crypto market desk",
+    category: "Crypto",
+    summary: "BTC/ETH moves can support context, but wallet/CLOB execution stays separate from MT5 prop-firm trading.",
+    url: "https://coinmarketcap.com/",
+    image: NEWS_IMAGES.crypto,
+    risk: "medium",
+  },
+  {
+    title: "Prediction markets as context only",
+    source: "Polymarket context",
+    category: "Polymarket",
+    summary: "Event odds can show crowd expectations, but Zeus never treats them as direct order signals.",
+    url: "https://polymarket.com/",
+    image: NEWS_IMAGES.polymarket,
+    risk: "low",
+  },
+];
 const BOT_CONNECTORS = [
   {
     id: "agentscope-runtime",
@@ -1657,6 +1702,88 @@ async function economicCalendar(request) {
   });
 }
 
+function stripXml(value = "") {
+  return String(value)
+    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+function inferNewsMeta(title = "", description = "") {
+  const text = `${title} ${description}`.toLowerCase();
+  if (text.includes("bitcoin") || text.includes("crypto") || text.includes("ethereum")) {
+    return { category: "Crypto", image: NEWS_IMAGES.crypto, risk: "medium" };
+  }
+  if (text.includes("fed") || text.includes("cpi") || text.includes("jobs") || text.includes("inflation") || text.includes("rate")) {
+    return { category: "Macro", image: NEWS_IMAGES.macro, risk: "high" };
+  }
+  if (text.includes("gold") || text.includes("dollar") || text.includes("euro") || text.includes("forex")) {
+    return { category: "Forex / Gold", image: NEWS_IMAGES.forex, risk: "medium" };
+  }
+  return { category: "Stocks", image: NEWS_IMAGES.stocks, risk: "low" };
+}
+
+async function newsFeed() {
+  let items = NEWS_FALLBACK;
+  let source = "protected fallback + InsiderWave-style research links";
+  try {
+    const response = await fetch("https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPY,QQQ,NVDA,AMD,TSLA,BTC-USD,GC=F,EURUSD=X&region=US&lang=en-US", {
+      headers: {
+        Accept: "application/rss+xml,text/xml",
+        "User-Agent": "ZeusTrading/1.0",
+      },
+    });
+    if (response.ok) {
+      const xml = await response.text();
+      const rows = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
+        .slice(0, 8)
+        .map((match) => {
+          const item = match[1];
+          const title = stripXml(item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "");
+          const summary = stripXml(item.match(/<description>([\s\S]*?)<\/description>/)?.[1] || "");
+          const url = stripXml(item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "https://finance.yahoo.com/");
+          const publishedAt = stripXml(item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "");
+          const meta = inferNewsMeta(title, summary);
+          return {
+            title,
+            source: "Yahoo Finance RSS",
+            category: meta.category,
+            summary: summary.slice(0, 220) || "Market catalyst loaded. Use as context only.",
+            url,
+            image: meta.image,
+            risk: meta.risk,
+            publishedAt,
+          };
+        })
+        .filter((item) => item.title);
+      if (rows.length) {
+        items = rows;
+        source = "Yahoo Finance RSS + Zeus image/risk normalization";
+      }
+    }
+  } catch (error) {
+    source = `fallback news (${error.message})`;
+  }
+
+  return jsonResponse({
+    ok: true,
+    source,
+    updatedAt: new Date().toISOString(),
+    items,
+    sourceLinks: {
+      insiderwave: "https://insiderwave.com/",
+      investing: "https://www.investing.com/",
+      investingCalendar: "https://www.investing.com/economic-calendar/",
+      polymarket: "https://polymarket.com/",
+      coinmarketcap: "https://coinmarketcap.com/",
+    },
+    safety: "News is a risk/catalyst feed only. It never creates direct orders.",
+  });
+}
+
 async function botConnectors(env = {}) {
   return jsonResponse({
     ok: true,
@@ -2155,6 +2282,12 @@ export default {
       return economicCalendar(request);
     }
     if (url.pathname === "/api/economic-calendar") {
+      return jsonResponse({ error: "Use GET." }, 405);
+    }
+    if (url.pathname === "/api/news-feed" && request.method === "GET") {
+      return newsFeed();
+    }
+    if (url.pathname === "/api/news-feed") {
       return jsonResponse({ error: "Use GET." }, 405);
     }
     if (url.pathname === "/api/bot-connectors" && request.method === "GET") {
