@@ -17,6 +17,7 @@ COPY database ./database
 COPY notifications ./notifications
 COPY risk ./risk
 COPY strategies ./strategies
+COPY mt5_bridge ./mt5_bridge
 
 RUN mkdir -p /data
 

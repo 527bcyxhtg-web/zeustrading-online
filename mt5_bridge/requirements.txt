@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+
+# Optional, installed only on MT5-capable hosts. Usually Windows with MT5 terminal.
+MetaTrader5>=5.0.45; platform_system == "Windows"
+

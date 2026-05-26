@@ -77,6 +77,7 @@ Current starter modules:
 - `broker/live_executor.py`: dry-run first Alpaca execution preparer, with real submit path only after guard approval.
 - `broker/alpaca_client.py`: Alpaca bracket order request builder with `client_order_id` and authenticated submit method.
 - `broker/ibkr_client.py`: IBKR bracket order preview builder with parent/take-profit/stop-loss legs and last-child transmit gate.
+- `mt5_bridge/server.py`: protected local/VPS MT5 bridge for health, account, symbols, quote, preview, manual approval submit, flatten/kill-switch, and journal routes.
 - `database/db.py`: SQLite migrations, audit log, and signal journal.
 - `notifications/telegram_bot.py`: Telegram message builder that stays disabled until token/chat are configured.
 - `app/main.py`: orchestrates scan -> news -> strategy -> risk -> kill switch -> execution guard -> journal.
@@ -169,6 +170,20 @@ Then test:
 ```bash
 curl http://localhost:8000/health
 curl -H "X-Admin-Token: YOUR_TOKEN" http://localhost:8000/preflight/paper
+```
+
+Protected MT5 bridge local run:
+
+```bash
+uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
+curl http://127.0.0.1:8789/health
+```
+
+The bridge previews and journals by default. Real MT5 live routing requires an
+open/logged-in MT5 terminal plus:
+
+```bash
+MT5_ENABLE_LIVE=true MT5_REQUIRE_TERMINAL=true uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
 ```
 
 Production backend env must include at least:
