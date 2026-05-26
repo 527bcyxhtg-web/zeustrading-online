@@ -14,12 +14,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
       - name: Validate frontend and worker
         run: |
           node --check app.js
           node --check public/app.js
           node --check public/_worker.js
           node tests/agent_engine.test.mjs
+          python -m pytest tests/test_mt5_bridge.py -q
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
