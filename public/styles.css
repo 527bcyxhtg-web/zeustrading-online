@@ -199,6 +199,36 @@
   line-height: 1.35;
 }
 
+.system-check-report-card {
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.system-check-report {
+  min-height: 128px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.26);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.system-check-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .admin-console-card,
 .market-board-card,
 .agent-chat-card,
@@ -521,6 +551,7 @@
   .control-center-grid,
   .start-here-flow,
   .system-check-timeline,
+  .system-check-actions,
   .live-intel-grid {
     grid-template-columns: 1fr;
   }

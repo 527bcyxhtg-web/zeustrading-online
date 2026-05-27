@@ -300,6 +300,18 @@
                 <small>Zeus will refresh live prices/news, run the risk gate, check MT5 bridge, then run the multi-agent supervisor.</small>
               </article>
             </div>
+            <div class="system-check-report-card">
+              <div class="card-title-row">
+                <span>Decision report</span>
+                <strong id="systemCheckDecision">Awaiting first check</strong>
+              </div>
+              <pre id="systemCheckReport" class="system-check-report">Run the full check to generate a protected-live decision report.</pre>
+              <div class="system-check-actions">
+                <button id="systemCheckSaveJournal" class="secondary-action" type="button">Save Report to Journal</button>
+                <button id="systemCheckBuildPreview" class="primary-action" type="button">Build Protected Preview</button>
+                <button id="systemCheckOpenBuilder" class="secondary-action" type="button">Open Builder</button>
+              </div>
+            </div>
           </section>
 
           <div class="control-center-grid">

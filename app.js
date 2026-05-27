@@ -689,6 +689,7 @@ const state = {
   agentStartedAt: Date.now(),
   agentPaused: false,
   agentChainRunning: false,
+  lastSystemCheckReport: null,
   selectedTarotIndex: 2,
   agentConsole: [],
   prediction: {
@@ -2918,6 +2919,105 @@ function renderSystemCheckTimeline(steps = null, status = "Not run yet") {
     .join("");
 }
 
+function renderSystemCheckReport(report = state.lastSystemCheckReport) {
+  const output = $("#systemCheckReport");
+  const decision = $("#systemCheckDecision");
+  if (!output || !decision) return;
+
+  if (!report) {
+    decision.textContent = "Awaiting first check";
+    output.textContent = "Run the full check to generate a protected-live decision report.";
+    return;
+  }
+
+  decision.textContent = report.decision;
+  const blockers = report.blockers.length ? report.blockers.join("; ") : "No hard blocker in the latest supervisor output.";
+  output.textContent = [
+    `Decision: ${report.decision}`,
+    `Generated: ${report.generatedAt}`,
+    `Challenge: ${report.challenge}`,
+    `Symbol: ${report.symbol}`,
+    `Bridge: ${report.bridge}`,
+    `Risk gate: ${report.risk}`,
+    `Daily buffer: ${report.dailyBuffer}`,
+    `Max DD buffer: ${report.maxBuffer}`,
+    `Blockers: ${blockers}`,
+    "",
+    `Next safest action: ${report.nextAction}`,
+    "",
+    "Live rule: no order without SL, TP, risk pass, fresh re-check, manual approval and audit log.",
+  ].join("\n");
+}
+
+function buildSystemCheckReport(decision, nextAction, riskText) {
+  const guard = fundedEliteGuardFromInputs();
+  const cycle = state.agentCycle || {};
+  const supervisor = cycle.agents?.find((agent) => agent.agent === "Supervisor Agent");
+  const blockers = supervisor?.exact_blockers || cycle.blockers || [];
+  const payload = collectExecutionPayload(false);
+  return {
+    decision,
+    generatedAt: new Date().toLocaleString("hr-HR", { dateStyle: "medium", timeStyle: "medium" }),
+    challenge: selectedChallengeRule().label,
+    symbol: payload.symbol,
+    bridge: state.exchange.mt5Connected ? "MT5 connected" : "MT5 disconnected",
+    risk: riskText || "Risk calculated",
+    dailyBuffer: fmtUsd.format(guard.dailyLossBufferRemaining || 0),
+    maxBuffer: fmtUsd.format(guard.maxDrawdownBufferRemaining || 0),
+    blockers,
+    nextAction,
+    raw: {
+      cycle,
+      preview: state.exchange.preview,
+      marketStatus: state.market.status,
+      newsRisk: state.economicCalendar.riskLevel,
+    },
+  };
+}
+
+function applyAgentPreviewToExecutionForm() {
+  const preview = state.agentCycle?.preview;
+  const payload = preview?.mt5_payload;
+  if (!payload) return false;
+
+  if ($("#executionSymbol")) $("#executionSymbol").value = payload.symbol || $("#executionSymbol").value;
+  if ($("#executionSide")) $("#executionSide").value = payload.direction === "SHORT" ? "SELL" : "BUY";
+  if ($("#executionEntry")) $("#executionEntry").value = Number(payload.entry || $("#executionEntry").value || 0).toFixed(2);
+  if ($("#executionStop")) $("#executionStop").value = Number(payload.stop_loss || $("#executionStop").value || 0).toFixed(2);
+  if ($("#executionTarget")) $("#executionTarget").value = Number(payload.take_profit || $("#executionTarget").value || 0).toFixed(2);
+  if ($("#executionPlatform") && selectHasValue("#executionPlatform", "mt5-bridge")) $("#executionPlatform").value = "mt5-bridge";
+  return true;
+}
+
+function saveSystemCheckReportToJournal() {
+  if (!state.lastSystemCheckReport) {
+    showToast("Run Full System Check first.");
+    return;
+  }
+  state.journal.unshift({
+    text: $("#systemCheckReport")?.textContent || JSON.stringify(state.lastSystemCheckReport),
+    time: new Date().toLocaleString("hr-HR", { dateStyle: "medium", timeStyle: "short" }),
+  });
+  state.journal = state.journal.slice(0, 10);
+  localStorage.setItem("propLabJournal", JSON.stringify(state.journal));
+  renderJournal();
+  auditExecution("system_check_journal_saved", state.lastSystemCheckReport);
+  showToast("System check report saved to journal.");
+}
+
+async function buildPreviewFromSystemCheck() {
+  const applied = applyAgentPreviewToExecutionForm();
+  if (!applied) {
+    const target = document.querySelector('[data-panel="bot-builder"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("No agent preview payload yet. Open Builder or run Full System Check first.");
+    return;
+  }
+  const target = document.querySelector('[data-panel="bot-builder"]');
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  await buildOrderPreview();
+}
+
 async function runFullSystemCheck() {
   const button = $("#runSystemCheck");
   if (button) button.disabled = true;
@@ -2984,10 +3084,15 @@ async function runFullSystemCheck() {
           ? "Next: fix blockers or wait. Do not submit live orders."
           : "Next: keep in watch/preview-only mode until bridge, news and risk all pass.";
     setStep(4, decision === "BLOCK" ? "blocked" : "done", "Next click", nextClick, `System check: ${decision}`);
+    state.lastSystemCheckReport = buildSystemCheckReport(decision, nextClick, riskText);
+    renderSystemCheckReport();
+    await auditExecution("system_check_completed", state.lastSystemCheckReport);
     agentConsoleLog("System check complete", nextClick);
     showToast(`System check complete: ${decision}.`);
   } catch (error) {
     setStep(4, "blocked", "System error", error.message, "System check blocked");
+    state.lastSystemCheckReport = buildSystemCheckReport("BLOCK", `System error: ${error.message}`, "System check failed");
+    renderSystemCheckReport();
     agentConsoleLog("System check failed", error.message);
     showToast("System check blocked. See Control Center timeline.");
   } finally {
@@ -3387,6 +3492,7 @@ async function runFullAgentChain() {
         approved: data.cycle.final_decision === "READY_FOR_MANUAL_APPROVAL",
         blockers: data.cycle.agents.find((agent) => agent.agent === "Supervisor Agent")?.exact_blockers || [],
       };
+      applyAgentPreviewToExecutionForm();
     }
     addExchangeLog("Agent cycle complete", data.cycle?.final_decision || data.reason || "No decision", response.ok ? "approved" : "blocked");
   } catch (error) {
@@ -3921,6 +4027,12 @@ function bindEvents() {
   });
 
   $("#runSystemCheck")?.addEventListener("click", runFullSystemCheck);
+  $("#systemCheckSaveJournal")?.addEventListener("click", saveSystemCheckReportToJournal);
+  $("#systemCheckBuildPreview")?.addEventListener("click", buildPreviewFromSystemCheck);
+  $("#systemCheckOpenBuilder")?.addEventListener("click", () => {
+    const target = document.querySelector('[data-panel="bot-builder"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   $("#startLoadData")?.addEventListener("click", () => {
     marketData.refresh();
@@ -4193,6 +4305,7 @@ bootStep("strategy library", renderStrategyLibrary);
 bootStep("admin dashboard", renderAdminDashboard);
 bootStep("start here flow", renderStartHereFlow);
 bootStep("system check timeline", renderSystemCheckTimeline);
+bootStep("system check report", renderSystemCheckReport);
 bootStep("guided flow", renderGuidedFlow);
 bootStep("bot connectors", renderBotConnectors);
 bootStep("clob terminal", renderClobMarkets);
