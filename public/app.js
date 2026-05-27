@@ -2889,6 +2889,112 @@ function routeControlDesk(type) {
   }
 }
 
+function renderSystemCheckTimeline(steps = null, status = "Not run yet") {
+  const timeline = $("#systemCheckTimeline");
+  const label = $("#systemCheckStatus");
+  if (!timeline || !label) return;
+
+  const rows =
+    steps ||
+    [
+      ["waiting", "Data", "Live prices, news and calendar"],
+      ["waiting", "Risk", "SL/TP, R:R, drawdown buffer"],
+      ["waiting", "Bridge", "MT5 health check"],
+      ["waiting", "Agents", "Scanner, news, rules, supervisor"],
+      ["waiting", "Next click", "System recommends the safest next action"],
+    ];
+
+  label.textContent = status;
+  timeline.innerHTML = rows
+    .map(
+      ([stateLabel, title, help]) => `
+        <article class="${stateLabel}">
+          <span>${stateLabel}</span>
+          <strong>${title}</strong>
+          <small>${help}</small>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+async function runFullSystemCheck() {
+  const button = $("#runSystemCheck");
+  if (button) button.disabled = true;
+
+  const steps = [
+    ["running", "Data", "Refreshing chart prices, market board, news and economic calendar..."],
+    ["waiting", "Risk", "Waiting for fresh market context."],
+    ["waiting", "Bridge", "Waiting for risk gate."],
+    ["waiting", "Agents", "Waiting for bridge status."],
+    ["waiting", "Next click", "Waiting for supervisor decision."],
+  ];
+
+  const setStep = (index, stateLabel, title, help, status = "Running system check") => {
+    steps[index] = [stateLabel, title, help];
+    renderSystemCheckTimeline(steps, status);
+  };
+
+  renderSystemCheckTimeline(steps, "Running system check");
+  agentConsoleLog("System check", "Full protected workflow started from Control Center.");
+
+  try {
+    const dataResults = await Promise.allSettled([marketData.refresh(), loadEconomicCalendar(), loadNewsFeed()]);
+    const dataOk = dataResults.every((result) => result.status === "fulfilled") && state.market.status !== "connecting";
+    setStep(
+      0,
+      dataOk ? "done" : "blocked",
+      "Data",
+      `${state.market.status || "unknown"} prices, ${state.news.items?.length || 0} news items, ${state.economicCalendar.events?.length || 0} calendar events.`,
+    );
+
+    buildSignal();
+    updateRisk();
+    renderStartHereFlow();
+    const riskText = $("#preflightStatus")?.textContent || $("#guardStatus")?.textContent || "Risk calculated";
+    const riskBlocked = String(riskText).toLowerCase().includes("block") || String(riskText).toLowerCase().includes("danger");
+    setStep(1, riskBlocked ? "blocked" : "done", "Risk", riskText, "Risk gate checked");
+
+    setStep(2, "running", "Bridge", "Checking MT5 bridge health. This does not submit an order.", "Checking bridge");
+    await connectExchange();
+    setStep(
+      2,
+      state.exchange.mt5Connected ? "done" : "blocked",
+      "Bridge",
+      state.exchange.mt5Connected ? "MT5 bridge connected." : "MT5 bridge is not connected. Preview can stay blocked until local/VPS bridge is online.",
+      "Bridge checked",
+    );
+
+    setStep(3, "running", "Agents", "Running scanner, macro risk, strategy validator, prop rules and supervisor.", "Running agents");
+    await runFullAgentChain();
+    const decision = state.agentCycle?.final_decision || "WATCH";
+    const supervisor = state.agentCycle?.agents?.find((agent) => agent.agent === "Supervisor Agent");
+    setStep(
+      3,
+      decision === "BLOCK" ? "blocked" : "done",
+      "Agents",
+      `${decision}: ${supervisor?.summary || supervisor?.reason || "Supervisor completed."}`,
+      "Agents finished",
+    );
+
+    const nextClick =
+      decision === "READY_FOR_MANUAL_APPROVAL" && state.exchange.mt5Connected
+        ? "Next: Build MT5 Preview, then approve manually only if the final preview still passes."
+        : decision === "BLOCK"
+          ? "Next: fix blockers or wait. Do not submit live orders."
+          : "Next: keep in watch/preview-only mode until bridge, news and risk all pass.";
+    setStep(4, decision === "BLOCK" ? "blocked" : "done", "Next click", nextClick, `System check: ${decision}`);
+    agentConsoleLog("System check complete", nextClick);
+    showToast(`System check complete: ${decision}.`);
+  } catch (error) {
+    setStep(4, "blocked", "System error", error.message, "System check blocked");
+    agentConsoleLog("System check failed", error.message);
+    showToast("System check blocked. See Control Center timeline.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function runOpenRouterAgent() {
   const button = $("#askOpenRouter");
   const output = $("#openRouterOutput");
@@ -3814,6 +3920,8 @@ function bindEvents() {
     showToast("Control Center refreshed.");
   });
 
+  $("#runSystemCheck")?.addEventListener("click", runFullSystemCheck);
+
   $("#startLoadData")?.addEventListener("click", () => {
     marketData.refresh();
     loadEconomicCalendar();
@@ -4084,6 +4192,7 @@ bootStep("news feed", renderNewsFeed);
 bootStep("strategy library", renderStrategyLibrary);
 bootStep("admin dashboard", renderAdminDashboard);
 bootStep("start here flow", renderStartHereFlow);
+bootStep("system check timeline", renderSystemCheckTimeline);
 bootStep("guided flow", renderGuidedFlow);
 bootStep("bot connectors", renderBotConnectors);
 bootStep("clob terminal", renderClobMarkets);

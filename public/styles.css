@@ -139,6 +139,66 @@
   box-shadow: inset 0 0 0 1px rgba(216, 255, 55, 0.1);
 }
 
+.control-system-check {
+  border: 1px solid rgba(216, 255, 55, 0.16);
+  border-radius: 14px;
+  padding: 16px;
+  background:
+    linear-gradient(90deg, rgba(216, 255, 55, 0.07), rgba(37, 199, 255, 0.035), rgba(255, 255, 255, 0.018)),
+    #080b0d;
+}
+
+.system-check-timeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.system-check-timeline article {
+  display: grid;
+  gap: 6px;
+  min-height: 118px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.system-check-timeline span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #07100b;
+  background: var(--amber);
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.system-check-timeline article.done span {
+  background: var(--green);
+}
+
+.system-check-timeline article.blocked span {
+  color: #fff;
+  background: var(--red);
+}
+
+.system-check-timeline article.running {
+  border-color: rgba(216, 255, 55, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(216, 255, 55, 0.08);
+}
+
+.system-check-timeline strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.system-check-timeline small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .admin-console-card,
 .market-board-card,
 .agent-chat-card,
@@ -460,6 +520,7 @@
 @media (max-width: 1160px) {
   .control-center-grid,
   .start-here-flow,
+  .system-check-timeline,
   .live-intel-grid {
     grid-template-columns: 1fr;
   }

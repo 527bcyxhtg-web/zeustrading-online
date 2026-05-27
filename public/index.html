@@ -250,6 +250,7 @@
             </div>
             <div class="control-hero-actions">
               <button class="primary-action quick-jump" type="button" data-quick-target="profile">Login / Register</button>
+              <button id="runSystemCheck" class="primary-action" type="button">Run Full System Check</button>
               <button id="refreshCommandCenter" class="secondary-action" type="button">Refresh Center</button>
             </div>
           </div>
@@ -286,6 +287,20 @@
               <button class="secondary-action quick-jump" type="button" data-quick-target="bot-builder">Preview</button>
             </article>
           </div>
+
+          <section class="control-system-check" aria-label="Full protected system check">
+            <div class="card-title-row">
+              <span>One-click workflow</span>
+              <strong id="systemCheckStatus">Not run yet</strong>
+            </div>
+            <div id="systemCheckTimeline" class="system-check-timeline">
+              <article>
+                <span>Waiting</span>
+                <strong>Click Run Full System Check</strong>
+                <small>Zeus will refresh live prices/news, run the risk gate, check MT5 bridge, then run the multi-agent supervisor.</small>
+              </article>
+            </div>
+          </section>
 
           <div class="control-center-grid">
             <article class="admin-console-card">
