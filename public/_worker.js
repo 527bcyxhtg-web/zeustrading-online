@@ -1015,6 +1015,51 @@ async function journalApi(request, env) {
   return jsonResponse({ ok: true, entries: rows.results || [] });
 }
 
+async function auditSummaryApi(request, env) {
+  if (!(await ensureExecutionAuditSchema(env))) return jsonResponse({ ok: false, error: "D1 database is not configured." }, 503);
+  const user = await currentUser(request, env);
+  const userId = user?.id || null;
+  const countRows = async (table) => {
+    const row = await env.zeustrading_users
+      .prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE user_id = ? OR (? IS NULL AND user_id IS NULL)`)
+      .bind(userId, userId)
+      .first();
+    return Number(row?.count || 0);
+  };
+  const [journalEntries, executionAudit, agentRuns, setupCandidates, tradePreviews, approvals, rejections, violations] = await Promise.all([
+    countRows("journal_entries"),
+    countRows("execution_audit"),
+    countRows("agent_run_logs"),
+    countRows("setup_candidates"),
+    countRows("trade_previews"),
+    countRows("approved_trades"),
+    countRows("rejected_trades"),
+    countRows("rule_violations"),
+  ]);
+  const latestAgent = await env.zeustrading_users
+    .prepare("SELECT final_decision, created_at FROM agent_run_logs WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 1")
+    .bind(userId, userId)
+    .first();
+  const kill = await killSwitchState(request, env);
+  return jsonResponse({
+    ok: true,
+    summary: {
+      journal_entries: journalEntries,
+      execution_audit: executionAudit,
+      agent_runs: agentRuns,
+      setup_candidates: setupCandidates,
+      trade_previews: tradePreviews,
+      approvals,
+      rejections,
+      rule_violations: violations,
+      latest_agent_decision: latestAgent?.final_decision || "none",
+      latest_agent_at: latestAgent?.created_at || null,
+      kill_switch_active: kill.active,
+      kill_switch_mode: kill.mode,
+    },
+  });
+}
+
 function restrictedClobCountries(env) {
   return String(env.CLOB_RESTRICTED_COUNTRIES || "US,CU,IR,KP,SY,RU,BY,MM")
     .split(",")
@@ -2265,6 +2310,12 @@ export default {
     }
     if (url.pathname === "/api/journal") {
       return jsonResponse({ error: "Use GET or POST." }, 405);
+    }
+    if (url.pathname === "/api/audit-summary" && request.method === "GET") {
+      return auditSummaryApi(request, env);
+    }
+    if (url.pathname === "/api/audit-summary") {
+      return jsonResponse({ error: "Use GET." }, 405);
     }
     if (url.pathname === "/api/market-data" && request.method === "GET") {
       return marketData(request);

@@ -684,6 +684,7 @@ const state = {
   journal: JSON.parse(localStorage.getItem("propLabJournal") || "[]"),
   cloudJournal: [],
   cloudJournalStatus: "Not synced",
+  auditSummary: null,
   scannerRun: 0,
   agentPlan: null,
   activeAgentStep: 0,
@@ -2482,9 +2483,14 @@ async function loadCloudJournal() {
   state.cloudJournalStatus = "Syncing...";
   renderJournal();
   try {
-    const response = await fetch("/api/journal", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Journal API unavailable.");
+    const [journalResponse, summaryResponse] = await Promise.all([
+      fetch("/api/journal", { cache: "no-store" }),
+      fetch("/api/audit-summary", { cache: "no-store" }),
+    ]);
+    const data = await journalResponse.json();
+    const summaryData = await summaryResponse.json().catch(() => ({}));
+    if (!journalResponse.ok || !data.ok) throw new Error(data.error || "Journal API unavailable.");
+    if (summaryResponse.ok && summaryData.ok) state.auditSummary = summaryData.summary;
     state.cloudJournal = (data.entries || []).map((entry) => {
       let payload = {};
       try {
@@ -2506,6 +2512,41 @@ async function loadCloudJournal() {
     agentConsoleLog("Cloud journal unavailable", error.message);
   }
   renderJournal();
+}
+
+function renderAuditSummary() {
+  const grid = $("#auditSummaryGrid");
+  if (!grid) return;
+  const summary = state.auditSummary;
+  if (!summary) {
+    grid.innerHTML = `
+      <article>
+        <span>Cloud audit</span>
+        <strong>Not synced</strong>
+        <small>Click Sync Cloud Audit to load backend counts.</small>
+      </article>
+    `;
+    return;
+  }
+  const cards = [
+    ["Agent runs", summary.agent_runs, summary.latest_agent_decision],
+    ["Previews", summary.trade_previews, "MT5/order previews"],
+    ["Approvals", summary.approvals, "Manual approval tokens"],
+    ["Rejections", summary.rejections, "Blocked setups"],
+    ["Violations", summary.rule_violations, "Rule blockers"],
+    ["Kill switch", summary.kill_switch_active ? "ACTIVE" : "Off", summary.kill_switch_mode],
+  ];
+  grid.innerHTML = cards
+    .map(
+      ([label, value, help]) => `
+        <article class="${label === "Kill switch" && value === "ACTIVE" ? "danger" : ""}">
+          <span>${label}</span>
+          <strong>${value}</strong>
+          <small>${help || "Backend audit"}</small>
+        </article>
+      `,
+    )
+    .join("");
 }
 
 function collectExecutionPayload(connectionOnly = false) {
@@ -3355,6 +3396,7 @@ function renderChecklist() {
 }
 
 function renderJournal() {
+  renderAuditSummary();
   const localEntries = state.journal
     .map(
       (entry) => `

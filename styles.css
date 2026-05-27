@@ -552,6 +552,7 @@
   .start-here-flow,
   .system-check-timeline,
   .system-check-actions,
+  .audit-summary-grid,
   .live-intel-grid {
     grid-template-columns: 1fr;
   }
@@ -4675,6 +4676,45 @@ a.danger-action {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.audit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.audit-summary-grid article {
+  display: grid;
+  gap: 4px;
+  min-height: 86px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 11px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.audit-summary-grid article.danger {
+  border-color: rgba(255, 93, 93, 0.28);
+  background: rgba(255, 93, 93, 0.08);
+}
+
+.audit-summary-grid span,
+.audit-summary-grid small {
+  color: var(--muted);
+}
+
+.audit-summary-grid span {
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.audit-summary-grid strong {
+  color: var(--ink);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
 }
 
 .journal-sync-status,
