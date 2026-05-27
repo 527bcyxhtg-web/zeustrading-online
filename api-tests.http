@@ -1,0 +1,34 @@
+@local = http://127.0.0.1:8789
+@prod = https://zeustrading.online
+
+### Production health
+GET {{prod}}/
+
+### Production news feed
+GET {{prod}}/api/news-feed
+
+### Production economic calendar
+GET {{prod}}/api/economic-calendar?focus=usd
+
+### Local MT5 bridge health
+GET {{local}}/health
+
+### Local MT5 bridge quote
+GET {{local}}/quote?symbol=XAUUSD
+
+### Local MT5 bridge protected preview
+POST {{local}}/order/preview
+Content-Type: application/json
+
+{
+  "exchange": "mt5-bridge",
+  "mode": "protected-live",
+  "symbol": "XAUUSD",
+  "side": "BUY",
+  "entry": 2380,
+  "stopLoss": 2375,
+  "takeProfit": 2390,
+  "quantity": 0.1,
+  "approved": true
+}
+

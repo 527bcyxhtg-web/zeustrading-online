@@ -1,0 +1,25 @@
+{
+  "editor.formatOnSave": false,
+  "editor.wordWrap": "on",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "search.exclude": {
+    "**/.wrangler": true,
+    "**/.netlify": true,
+    "**/.uix": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  },
+  "python.defaultInterpreterPath": "python3",
+  "liveServer.settings.root": "/public",
+  "rest-client.environmentVariables": {
+    "local": {
+      "baseUrl": "http://127.0.0.1:8789"
+    },
+    "production": {
+      "baseUrl": "https://zeustrading.online"
+    }
+  }
+}
+

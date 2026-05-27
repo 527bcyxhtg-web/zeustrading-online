@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "MT5 Bridge: FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["mt5_bridge.server:app", "--host", "127.0.0.1", "--port", "8789", "--reload"],
+      "env": {
+        "MT5_ENABLE_LIVE": "false",
+        "MT5_REQUIRE_TERMINAL": "false"
+      },
+      "jinja": false
+    }
+  ]
+}
+

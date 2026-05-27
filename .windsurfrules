@@ -1,0 +1,46 @@
+# Zeus Trading Windsurf Rules
+
+You are working on Zeus Trading, a protected live trading cockpit.
+
+Primary goal:
+- Make the app simple enough that a new user knows exactly what to click first.
+- Keep the design premium, dark, chart-first, and operational.
+- Preserve protected-live safety: no blind auto-trading, no password/2FA automation, no seed phrase handling.
+
+Required user flow:
+1. Admin Profile: register/login, save bot settings, public wallet address only.
+2. Live Intelligence: market board, news with images, economic calendar, Polymarket context.
+3. Strategy: choose FTMO/FundedElite, XAUUSD, VWAP, crypto bot, or Polymarket CLOB route.
+4. Risk Gate: SL, TP, R:R, daily loss, max drawdown, spread, news, kill switch.
+5. Preview: MT5 bridge or wallet/CLOB preview only.
+6. Approval: live submit requires explicit user click and audit log.
+
+Design rules:
+- First viewport must show what the app is, what is connected, and what to click next.
+- Use compact, clear panels. Avoid decorative noise that hides workflow.
+- Keep cards at 8-14px radius, clear borders, consistent buttons, readable text.
+- Use illustrations/images where helpful, especially news and trading map areas.
+- Mobile must be single-column without horizontal overflow.
+
+Architecture rules:
+- Root files: index.html, styles.css, app.js.
+- Deploy files: public/index.html, public/styles.css, public/app.js, public/_worker.js.
+- After editing root frontend files, sync them to public/.
+- Cloudflare Pages output is public/.
+- Cloudflare Worker APIs live in public/_worker.js.
+- MT5 bridge lives in mt5_bridge/server.py and runs locally on http://127.0.0.1:8789.
+
+Safety rules:
+- Never allow order without stop-loss and take-profit.
+- Never bypass manual approval.
+- Never store broker keys, wallet seed phrases, or private keys in frontend code.
+- News, TradingView ideas, Polymarket odds and tarot are context only, not trade signals.
+
+Verification before completion:
+- node --check app.js
+- node --check public/app.js
+- node --check public/_worker.js
+- node tests/agent_engine.test.mjs
+- python3 -m pytest tests/test_mt5_bridge.py -q
+- npx wrangler pages deploy public --project-name zeustrading-online --commit-dirty=true
+

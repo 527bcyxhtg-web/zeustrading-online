@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Zeus: Verify all",
+      "type": "shell",
+      "command": "node --check app.js && node --check public/app.js && node --check public/_worker.js && node tests/agent_engine.test.mjs && python3 -m pytest tests/test_mt5_bridge.py -q",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Zeus: Sync public frontend",
+      "type": "shell",
+      "command": "cp index.html public/index.html && cp styles.css public/styles.css && cp app.js public/app.js",
+      "problemMatcher": []
+    },
+    {
+      "label": "Zeus: Run MT5 bridge safe",
+      "type": "shell",
+      "command": "./scripts/start_mt5_bridge.sh",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Zeus: Deploy Cloudflare",
+      "type": "shell",
+      "command": "npx wrangler pages deploy public --project-name zeustrading-online --commit-dirty=true",
+      "problemMatcher": []
+    }
+  ]
+}
+
