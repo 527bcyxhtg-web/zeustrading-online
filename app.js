@@ -1612,6 +1612,39 @@ function renderAdminDashboard() {
   `;
 }
 
+function renderStartHereFlow() {
+  const profileState = $("#startProfileState");
+  if (!profileState) return;
+  const loggedIn = Boolean(state.user);
+  const marketReady = state.market.status === "live" || state.market.status === "degraded";
+  const calendarReady = Boolean(state.economicCalendar.updatedAt);
+  const newsReady = Boolean(state.news.updatedAt);
+  const strategy = botStrategyProfiles[$("#botStrategy")?.value || "vwap"]?.label || "Strategy selected";
+  const riskStatus = $("#preflightStatus")?.textContent || "Not run";
+  const previewReady = Boolean(state.exchange.preview?.approved);
+
+  profileState.textContent = loggedIn ? `Admin ready: ${state.user.name}` : "Login or register first";
+  $("#startDataState").textContent = marketReady
+    ? `${state.market.status === "live" ? "Live" : "Fallback"} prices · calendar ${calendarReady ? "ready" : "pending"} · news ${newsReady ? "ready" : "pending"}`
+    : "Load market board, news and calendar";
+  $("#startStrategyState").textContent = strategy;
+  $("#startRiskState").textContent = riskStatus;
+  $("#startPreviewState").textContent = previewReady ? "Preview approved, manual click required" : "Build preview after risk gate";
+
+  const states = {
+    profile: loggedIn,
+    "live-data": marketReady && (calendarReady || newsReady),
+    strategy: true,
+    risk: String(riskStatus).toLowerCase().includes("ok"),
+    preview: previewReady,
+  };
+
+  $$(".start-step").forEach((step) => {
+    step.classList.toggle("done", Boolean(states[step.dataset.startStep]));
+    step.classList.toggle("active", !states[step.dataset.startStep]);
+  });
+}
+
 function renderBotConnectors(data = null) {
   const connectors = data?.connectors || state.botConnectors.connectors || botConnectorSeeds;
   const skills = data?.skills || state.botConnectors.skills || cmcSkillSeeds;
@@ -2225,6 +2258,7 @@ function applyUserProfile(user) {
   buildBotConfig();
   renderAgentControlStatus();
   renderAdminDashboard();
+  renderStartHereFlow();
 }
 
 async function loadCurrentUser() {
@@ -3621,6 +3655,7 @@ function bindEvents() {
     loadEconomicCalendar();
     loadNewsFeed();
     renderAdminDashboard();
+    renderStartHereFlow();
     showToast("Live desk refreshed: chart, scanner and calendar.");
   });
 
@@ -3630,7 +3665,25 @@ function bindEvents() {
     loadNewsFeed();
     renderStrategyLibrary();
     renderAdminDashboard();
+    renderStartHereFlow();
     showToast("Control Center refreshed.");
+  });
+
+  $("#startLoadData")?.addEventListener("click", () => {
+    marketData.refresh();
+    loadEconomicCalendar();
+    loadNewsFeed();
+    renderStartHereFlow();
+    showToast("Live data, calendar and news are refreshing.");
+  });
+
+  $("#startRunRisk")?.addEventListener("click", () => {
+    buildSignal();
+    updateRisk();
+    renderStartHereFlow();
+    const target = document.querySelector('[data-panel="signal"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("Risk gate refreshed.");
   });
 
   $("#adminSaveShortcut")?.addEventListener("click", () => {
@@ -3673,6 +3726,7 @@ function bindEvents() {
       const target = document.querySelector('[data-panel="bot-builder"]');
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+    renderStartHereFlow();
     showToast("Strategy selected for protected builder.");
   });
 
@@ -3875,6 +3929,7 @@ bootStep("economic calendar", renderEconomicCalendar);
 bootStep("news feed", renderNewsFeed);
 bootStep("strategy library", renderStrategyLibrary);
 bootStep("admin dashboard", renderAdminDashboard);
+bootStep("start here flow", renderStartHereFlow);
 bootStep("guided flow", renderGuidedFlow);
 bootStep("bot connectors", renderBotConnectors);
 bootStep("clob terminal", renderClobMarkets);
