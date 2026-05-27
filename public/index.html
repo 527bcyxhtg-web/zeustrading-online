@@ -316,6 +316,16 @@
                 <button class="secondary-action" type="button" data-chat-prompt="Review Polymarket context as macro risk only, not a signal.">Polymarket risk</button>
                 <button class="secondary-action" type="button" data-chat-prompt="Explain why this trade should be blocked or preview-only.">Block/approve</button>
               </div>
+              <form id="controlChatForm" class="control-chat-form">
+                <label for="controlChatInput">Ask Zeus</label>
+                <textarea id="controlChatInput" rows="3" placeholder="Npr. provjeri XAUUSD za FundedElite/FTMO, vijesti, risk i sljedeci siguran korak."></textarea>
+                <button id="controlChatSend" class="primary-action" type="submit">Ask Agent</button>
+              </form>
+              <pre id="controlChatOutput" class="control-chat-output">Agent ceka pitanje. Shortcuti iznad odmah pokrecu review.</pre>
+              <div class="route-action-grid">
+                <button class="secondary-action" type="button" data-route-desk="ftmo">FTMO Challenge Desk</button>
+                <button class="secondary-action" type="button" data-route-desk="polymarket">Polymarket CLOB Desk</button>
+              </div>
               <a class="primary-action chat-open-button" href="/chat/?session=agent%3Amain%3Amain">Open Full Chat</a>
             </article>
           </div>

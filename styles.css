@@ -196,6 +196,59 @@
   color: #f1b84b;
 }
 
+.admin-readiness {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.admin-readiness > strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.readiness-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+}
+
+.readiness-row span {
+  display: inline-flex;
+  justify-content: center;
+  padding: 4px 6px;
+  border-radius: 999px;
+  color: #07100b;
+  background: var(--amber);
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.readiness-row.ready span {
+  background: var(--green);
+}
+
+.readiness-row b,
+.readiness-row small {
+  display: block;
+}
+
+.readiness-row b {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.readiness-row small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .quick-market-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -231,6 +284,57 @@
 .agent-chat-card p {
   color: var(--muted);
   margin-top: 0;
+}
+
+.control-chat-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.control-chat-form label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.control-chat-form textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 11px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.24);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.control-chat-output {
+  min-height: 118px;
+  max-height: 230px;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 12px 0 0;
+  border: 1px solid rgba(216, 255, 55, 0.14);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(216, 255, 55, 0.055), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.28);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.route-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .chat-open-button {

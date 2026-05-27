@@ -1587,6 +1587,35 @@ function renderAdminDashboard() {
   if (!admin) return;
   const loggedIn = Boolean(state.user);
   const botProfile = state.user?.profile?.botProfile || botProfileFromInputs();
+  const riskPercent = Number(botProfile.riskPercent || numberValue("#botRisk") || 0.25);
+  const bridgeUrl = $("#mt5BridgeUrl")?.value || "http://127.0.0.1:8789";
+  const readiness = [
+    {
+      label: "Registration",
+      ready: loggedIn,
+      detail: loggedIn ? `${state.user.email} saved` : "Create/login profile first",
+    },
+    {
+      label: "Risk cap",
+      ready: riskPercent > 0 && riskPercent <= 0.5,
+      detail: `${riskPercent.toFixed(2)}% per trade`,
+    },
+    {
+      label: "MT5 bridge",
+      ready: state.exchange.mt5Connected,
+      detail: state.exchange.mt5Connected ? "Connected" : bridgeUrl,
+    },
+    {
+      label: "Manual approval",
+      ready: $("#agentRequireApproval")?.checked !== false,
+      detail: "Required before protected live submit",
+    },
+    {
+      label: "News/calendar",
+      ready: Boolean(state.news.updatedAt || state.economicCalendar.updatedAt),
+      detail: state.news.updatedAt || state.economicCalendar.updatedAt ? "Risk feed loaded" : "Refresh live desk",
+    },
+  ];
   $("#adminConsoleStatus").textContent = loggedIn ? "Admin profile active" : "Register to unlock admin";
   admin.innerHTML = `
     <div class="admin-kpi ${loggedIn ? "ready" : "warn"}">
@@ -1601,13 +1630,29 @@ function renderAdminDashboard() {
     </div>
     <div class="admin-kpi">
       <span>Risk</span>
-      <strong>${Number(botProfile.riskPercent || numberValue("#botRisk") || 0.25).toFixed(2)}%</strong>
+      <strong>${riskPercent.toFixed(2)}%</strong>
       <small>Default per trade risk cap.</small>
     </div>
     <div class="admin-kpi">
       <span>Bridge</span>
       <strong>${state.exchange.mt5Connected ? "Connected" : "Local check"}</strong>
-      <small>${$("#mt5BridgeUrl")?.value || "http://127.0.0.1:8789"}</small>
+      <small>${bridgeUrl}</small>
+    </div>
+    <div class="admin-readiness">
+      <strong>Admin readiness</strong>
+      ${readiness
+        .map(
+          (item) => `
+            <div class="readiness-row ${item.ready ? "ready" : "todo"}">
+              <span>${item.ready ? "Ready" : "Todo"}</span>
+              <div>
+                <b>${item.label}</b>
+                <small>${item.detail}</small>
+              </div>
+            </div>
+          `,
+        )
+        .join("")}
     </div>
   `;
 }
@@ -2744,6 +2789,106 @@ function localAgentReview(context) {
   ].join("\n");
 }
 
+function localControlChatReview(context, prompt) {
+  const guard = context.fundedEliteGuard || fundedEliteGuardFromInputs();
+  const blockers = [];
+  if (!context.hardRules.registeredUser) blockers.push("profile is not saved");
+  if (!state.exchange.mt5Connected) blockers.push("MT5 bridge is not connected");
+  if (state.news.items?.some((item) => item.impact === "high")) blockers.push("high-impact news needs manual review");
+  if (guard.rulePass === false) blockers.push("challenge drawdown buffer is too thin");
+
+  const decision = blockers.length ? "WATCH / PREVIEW ONLY" : "READY FOR RISK GATE";
+  return [
+    `ZEUS CONTROL REVIEW: ${decision}`,
+    "",
+    `Question: ${prompt || "General protected-live check"}`,
+    `Challenge: ${context.challenge.label}`,
+    `Primary market: ${context.market.label}`,
+    `Daily buffer: ${fmtUsd.format(guard.dailyLossBufferRemaining || 0)}`,
+    `Max DD buffer: ${fmtUsd.format(guard.maxDrawdownBufferRemaining || 0)}`,
+    "",
+    blockers.length ? `Blockers: ${blockers.join(", ")}.` : "No hard blocker found in local dashboard context.",
+    "Next safest action: refresh prices/news, run Risk Gate, build MT5 preview, then approve manually only if SL/TP/R:R are valid.",
+  ].join("\n");
+}
+
+async function runControlCenterChat(prompt = "") {
+  const input = $("#controlChatInput");
+  const output = $("#controlChatOutput");
+  const button = $("#controlChatSend");
+  if (!output) return;
+
+  const question = (prompt || input?.value || "").trim();
+  if (!question) {
+    output.textContent = "Napiši pitanje ili klikni jedan shortcut iznad.";
+    return;
+  }
+
+  const context = {
+    ...(state.agentPlan || collectAgentContext()),
+    userPrompt: question,
+    controlCenter: {
+      role: "protected live trading supervisor",
+      expectedAnswer: "Return BLOCK/WATCH/PREVIEW_ONLY/READY_FOR_MANUAL_APPROVAL and next safest click.",
+      marketStatus: state.market.status,
+      mt5Connected: state.exchange.mt5Connected,
+      currentPreview: state.exchange.preview,
+      news: state.news.items?.slice(0, 4) || [],
+      calendar: state.economicCalendar.events?.slice(0, 4) || [],
+    },
+    fundedEliteGuard: fundedEliteGuardFromInputs(),
+  };
+
+  if (button) button.disabled = true;
+  if (input) input.value = question;
+  output.textContent = "Zeus agent provjerava challenge rules, news/calendar, MT5 status, risk gate i sljedeci siguran korak...";
+  agentConsoleLog("Control chat", question);
+
+  try {
+    const response = await fetch("/api/openrouter-agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context }),
+    });
+    const data = await response.json();
+    output.textContent = data.content || data.fallback || data.error || localControlChatReview(context, question);
+    agentConsoleLog(response.ok ? "Control chat complete" : "Control chat fallback", data.model || data.error || "local guard");
+    showToast(response.ok ? "Agent answer ready." : "Agent fallback answer ready.");
+  } catch (error) {
+    output.textContent = localControlChatReview(context, question);
+    agentConsoleLog("Control chat fallback", error.message);
+    showToast("OpenRouter unavailable; local protected review shown.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function routeControlDesk(type) {
+  if (type === "ftmo") {
+    if (selectHasValue("#agentChallenge", "fundedEliteFlash")) $("#agentChallenge").value = "fundedEliteFlash";
+    if (selectHasValue("#agentMarket", "xau")) $("#agentMarket").value = "xau";
+    if (selectHasValue("#agentStyle", "vwap")) $("#agentStyle").value = "vwap";
+    if (selectHasValue("#botMarket", "gold")) $("#botMarket").value = "gold";
+    if (selectHasValue("#botStrategy", "vwap")) $("#botStrategy").value = "vwap";
+    if (selectHasValue("#executionPlatform", "mt5-bridge")) $("#executionPlatform").value = "mt5-bridge";
+    if (selectHasValue("#executionModeSelect", "protected-live")) $("#executionModeSelect").value = "protected-live";
+    buildAgentPlan();
+    buildBotConfig();
+    const target = document.querySelector('[data-panel="bot-builder"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("FTMO/FundedElite desk prepared.");
+    return;
+  }
+
+  if (type === "polymarket") {
+    loadPredictionMarkets();
+    loadClobMarkets();
+    const target = document.querySelector('[data-panel="clob-wallet"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("Polymarket CLOB desk prepared.");
+  }
+}
+
 async function runOpenRouterAgent() {
   const button = $("#askOpenRouter");
   const output = $("#openRouterOutput");
@@ -3694,6 +3839,15 @@ function bindEvents() {
 
   $("#loadNewsFeed")?.addEventListener("click", loadNewsFeed);
 
+  $("#controlChatForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runControlCenterChat();
+  });
+
+  $$(".route-action-grid [data-route-desk]").forEach((button) => {
+    button.addEventListener("click", () => routeControlDesk(button.dataset.routeDesk));
+  });
+
   $("#quickMarketBoard")?.addEventListener("click", (event) => {
     const tile = event.target.closest("[data-market-symbol]");
     if (!tile) return;
@@ -3735,9 +3889,9 @@ function bindEvents() {
       $("#agentDock")?.classList.add("open");
       if ($("#agentDockToggle")) $("#agentDockToggle").textContent = "Close";
       const prompt = button.dataset.chatPrompt;
-      $("#agentDockInput").value = prompt;
-      agentConsoleLog("Chat prompt loaded", prompt);
-      showToast("Prompt loaded in agent chat.");
+      if ($("#agentDockInput")) $("#agentDockInput").value = prompt;
+      if ($("#controlChatInput")) $("#controlChatInput").value = prompt;
+      runControlCenterChat(prompt);
     });
   });
 
