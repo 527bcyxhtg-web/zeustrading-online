@@ -1325,7 +1325,10 @@
                   <h2>Trade Journal</h2>
                   <p>Write the reason before the trade exists.</p>
                 </div>
-                <button id="addJournal" class="secondary-action" type="button">Add Note</button>
+                <div class="journal-actions">
+                  <button id="refreshJournalCloud" class="secondary-action" type="button">Sync Cloud Audit</button>
+                  <button id="addJournal" class="secondary-action" type="button">Add Note</button>
+                </div>
               </div>
               <textarea id="journalText" rows="4" placeholder="Example: XAUUSD H1 liquidity sweep near resistance. I will only act after close confirmation and fixed SL."></textarea>
               <div id="journalEntries" class="journal-entries"></div>

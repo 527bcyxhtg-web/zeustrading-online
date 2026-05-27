@@ -682,6 +682,8 @@ const state = {
   filter: "all",
   checked: new Set(),
   journal: JSON.parse(localStorage.getItem("propLabJournal") || "[]"),
+  cloudJournal: [],
+  cloudJournalStatus: "Not synced",
   scannerRun: 0,
   agentPlan: null,
   activeAgentStep: 0,
@@ -2443,6 +2445,69 @@ async function auditExecution(eventType, payload = {}) {
   }
 }
 
+async function saveCloudJournalEntry(eventType, payload = {}) {
+  try {
+    const response = await fetch("/api/journal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventType, payload }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || "Journal API failed.");
+    return data.entry || null;
+  } catch (error) {
+    agentConsoleLog("Cloud journal pending", error.message);
+    return null;
+  }
+}
+
+function summarizeJournalPayload(eventType, payload = {}) {
+  let value = payload || {};
+  if (typeof payload === "string") {
+    try {
+      value = JSON.parse(payload || "{}");
+    } catch (error) {
+      value = { text: payload };
+    }
+  }
+  if (value.text) return value.text;
+  if (value.decision || value.nextAction) return `${value.decision || eventType}: ${value.nextAction || "Decision saved."}`;
+  if (value.cycle?.final_decision) return `${value.cycle.final_decision}: ${value.cycle.agents?.find((agent) => agent.agent === "Supervisor Agent")?.summary || "Agent cycle saved."}`;
+  if (value.final_decision) return `${value.final_decision}: ${value.agents?.find((agent) => agent.agent === "Supervisor Agent")?.summary || "Agent cycle saved."}`;
+  if (value.mode || value.reason) return `${value.mode || eventType}: ${value.reason || "Audit event saved."}`;
+  return JSON.stringify(value).slice(0, 420);
+}
+
+async function loadCloudJournal() {
+  state.cloudJournalStatus = "Syncing...";
+  renderJournal();
+  try {
+    const response = await fetch("/api/journal", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Journal API unavailable.");
+    state.cloudJournal = (data.entries || []).map((entry) => {
+      let payload = {};
+      try {
+        payload = JSON.parse(entry.payload || "{}");
+      } catch (error) {
+        payload = { text: entry.payload || "Unparseable journal payload" };
+      }
+      return {
+        id: entry.id,
+        eventType: entry.event_type,
+        time: new Date(entry.created_at).toLocaleString("hr-HR", { dateStyle: "medium", timeStyle: "short" }),
+        text: summarizeJournalPayload(entry.event_type, payload),
+      };
+    });
+    state.cloudJournalStatus = `${state.cloudJournal.length} cloud entries`;
+    agentConsoleLog("Cloud journal", state.cloudJournalStatus);
+  } catch (error) {
+    state.cloudJournalStatus = `Cloud sync unavailable: ${error.message}`;
+    agentConsoleLog("Cloud journal unavailable", error.message);
+  }
+  renderJournal();
+}
+
 function collectExecutionPayload(connectionOnly = false) {
   const accountSize = numberValue("#initialCapital") || 100000;
   const riskPercent = numberValue("#botRisk") || 0.25;
@@ -3002,6 +3067,7 @@ function saveSystemCheckReportToJournal() {
   localStorage.setItem("propLabJournal", JSON.stringify(state.journal));
   renderJournal();
   auditExecution("system_check_journal_saved", state.lastSystemCheckReport);
+  saveCloudJournalEntry("system_check_report", state.lastSystemCheckReport).then(loadCloudJournal);
   showToast("System check report saved to journal.");
 }
 
@@ -3289,16 +3355,33 @@ function renderChecklist() {
 }
 
 function renderJournal() {
-  $("#journalEntries").innerHTML = state.journal
+  const localEntries = state.journal
     .map(
       (entry) => `
-        <article class="journal-entry">
+        <article class="journal-entry local">
           <time>${entry.time}</time>
+          <strong>Local note</strong>
           <p>${entry.text}</p>
         </article>
       `,
     )
     .join("");
+  const cloudEntries = state.cloudJournal
+    .map(
+      (entry) => `
+        <article class="journal-entry cloud">
+          <time>${entry.time}</time>
+          <strong>${entry.eventType}</strong>
+          <p>${entry.text}</p>
+        </article>
+      `,
+    )
+    .join("");
+  $("#journalEntries").innerHTML = `
+    <div class="journal-sync-status">${state.cloudJournalStatus}</div>
+    ${localEntries || '<article class="journal-entry"><strong>Local journal empty</strong><p>Add a reason before any trade exists.</p></article>'}
+    ${cloudEntries ? `<div class="journal-section-label">Cloud audit</div>${cloudEntries}` : ""}
+  `;
 }
 
 function renderAgentControlStatus() {
@@ -4058,6 +4141,7 @@ function bindEvents() {
   });
 
   $("#loadNewsFeed")?.addEventListener("click", loadNewsFeed);
+  $("#refreshJournalCloud")?.addEventListener("click", loadCloudJournal);
 
   $("#controlChatForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -4262,6 +4346,7 @@ function bindEvents() {
     localStorage.setItem("propLabJournal", JSON.stringify(state.journal));
     $("#journalText").value = "";
     renderJournal();
+    saveCloudJournalEntry("manual_journal_note", { text }).then(loadCloudJournal);
     showToast("Journal note saved locally.");
   });
 
@@ -4317,6 +4402,7 @@ bootStep("agent control", renderAgentControlStatus);
 bootStep("ideas", renderIdeas);
 bootStep("checklist", renderChecklist);
 bootStep("journal", renderJournal);
+bootStep("cloud journal", loadCloudJournal);
 bootStep("tarot", renderTarotPlaceholder);
 bootStep("agent loop", startActiveAgentLoop);
 bootStep("execution", renderExecution);
