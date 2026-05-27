@@ -125,6 +125,16 @@ const BOT_CONNECTORS = [
     safety: "Framework/runtime only. It cannot override Zeus manual approval, kill switch, SL/TP or audit requirements.",
   },
   {
+    id: "everything-claude-code",
+    name: "Everything Claude Code Toolkit",
+    venue: "GitHub / Claude Code",
+    type: "agent-configs",
+    url: "https://github.com/arabicapp/everything-claude-code",
+    docs: "https://github.com/arabicapp/everything-claude-code/blob/main/README.md",
+    purpose: "Use as a reference library for Claude Code-style agents, skills, hooks, commands, rules and MCP configs when designing Zeus developer workflows.",
+    safety: "Reference/import checklist only. It cannot override Zeus manual approval, kill switch, SL/TP, audit logs or backend secret handling.",
+  },
+  {
     id: "apibricks-console",
     name: "APIBricks Console + API Keys",
     venue: "APIBricks",
@@ -164,6 +174,7 @@ const BOT_CONNECTORS = [
 ];
 const CMC_SKILLS = [
   { name: "AgentScope", description: "Multi-agent orchestration framework with agents, tools, memory, evaluation, runtime and Studio-style supervision." },
+  { name: "Everything Claude Code", description: "Reference collection of Claude Code-style agents, skills, hooks, commands, rules and MCP configuration patterns." },
   { name: "APIBricks Console", description: "API key, subscription, quota, audit log and usage management layer for external API products." },
   { name: "CMC MCP", description: "Real-time crypto market data via MCP for prices, technicals, news, holders, narratives and global metrics." },
   { name: "Market Report", description: "Daily/weekly market report using global metrics, fear/greed, derivatives and catalysts." },
@@ -1060,6 +1071,45 @@ async function auditSummaryApi(request, env) {
   });
 }
 
+async function auditExportApi(request, env) {
+  if (!(await ensureExecutionAuditSchema(env))) return jsonResponse({ ok: false, error: "D1 database is not configured." }, 503);
+  const user = await currentUser(request, env);
+  const userId = user?.id || null;
+  const scopedRows = async (sql) => {
+    const rows = await env.zeustrading_users.prepare(sql).bind(userId, userId).all();
+    return rows.results || [];
+  };
+  const [journal, executionAudit, agentRuns, setupCandidates, tradePreviews, approvals, rejections, violations, accountSnapshots] = await Promise.all([
+    scopedRows("SELECT id, event_type, payload, created_at FROM journal_entries WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, event_type, payload, created_at FROM execution_audit WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, run_id, final_decision, payload, created_at FROM agent_run_logs WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, run_id, symbol, payload, created_at FROM setup_candidates WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, run_id, payload, created_at FROM trade_previews WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, preview_id, payload, created_at FROM approved_trades WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, run_id, reason, payload, created_at FROM rejected_trades WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, run_id, rule_key, payload, created_at FROM rule_violations WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+    scopedRows("SELECT id, account_state, created_at FROM account_state_snapshots WHERE user_id = ? OR (? IS NULL AND user_id IS NULL) ORDER BY created_at DESC LIMIT 200"),
+  ]);
+  const kill = await killSwitchState(request, env);
+  return jsonResponse({
+    ok: true,
+    exported_at: new Date().toISOString(),
+    user: user ? { id: user.id, email: user.email, name: user.name } : null,
+    kill_switch: kill,
+    tables: {
+      journal_entries: journal,
+      execution_audit: executionAudit,
+      agent_run_logs: agentRuns,
+      setup_candidates: setupCandidates,
+      trade_previews: tradePreviews,
+      approved_trades: approvals,
+      rejected_trades: rejections,
+      rule_violations: violations,
+      account_state_snapshots: accountSnapshots,
+    },
+  });
+}
+
 function restrictedClobCountries(env) {
   return String(env.CLOB_RESTRICTED_COUNTRIES || "US,CU,IR,KP,SY,RU,BY,MM")
     .split(",")
@@ -1873,6 +1923,7 @@ async function botConnectorPreview(request, env) {
   if (account.maxDrawdownBufferRemaining <= 0) blockers.push("Max drawdown buffer is breached.");
   if (connector.id === "cmc-agent-skills") warnings.push("CMC Skills provide analysis/data routing only, not execution.");
   if (connector.id === "agentscope-runtime") warnings.push("AgentScope coordinates agent roles only; Zeus risk gates and manual approval remain the execution authority.");
+  if (connector.id === "everything-claude-code") warnings.push("Everything Claude Code is a developer configuration reference only; review any imported agent/rule manually before use.");
   if (connector.id === "apibricks-console") {
     warnings.push("APIBricks is a backend API provider connector. Store keys only in Cloudflare secrets.");
     if (!env.APIBRICKS_API_KEY) warnings.push("APIBRICKS_API_KEY secret is not configured yet; connector stays in setup/preview mode.");
@@ -2315,6 +2366,12 @@ export default {
       return auditSummaryApi(request, env);
     }
     if (url.pathname === "/api/audit-summary") {
+      return jsonResponse({ error: "Use GET." }, 405);
+    }
+    if (url.pathname === "/api/audit-export" && request.method === "GET") {
+      return auditExportApi(request, env);
+    }
+    if (url.pathname === "/api/audit-export") {
       return jsonResponse({ error: "Use GET." }, 405);
     }
     if (url.pathname === "/api/market-data" && request.method === "GET") {

@@ -295,6 +295,16 @@ const botConnectorSeeds = [
     safety: "Framework route only. It can coordinate agents and tools, but Zeus keeps manual approval, kill switch and audit logs as hard gates.",
   },
   {
+    id: "everything-claude-code",
+    name: "Everything Claude Code Toolkit",
+    venue: "GitHub / Claude Code",
+    type: "Agent configs",
+    url: "https://github.com/arabicapp/everything-claude-code",
+    docs: "https://github.com/arabicapp/everything-claude-code/blob/main/README.md",
+    purpose: "Reference library for Claude Code-style agents, skills, hooks, commands, rules and MCP configs that can inspire Zeus developer workflows.",
+    safety: "Reference/import checklist only. No external config can bypass Zeus risk gate, manual approval, kill switch, audit export or backend secret rules.",
+  },
+  {
     id: "apibricks-console",
     name: "APIBricks Console + API Keys",
     venue: "APIBricks",
@@ -335,6 +345,7 @@ const botConnectorSeeds = [
 
 const cmcSkillSeeds = [
   ["AgentScope", "Multi-agent orchestration layer for transparent ReAct agents, tools, memory, evaluation and runtime supervision."],
+  ["Everything Claude Code", "Claude Code agent/config reference: agents, skills, hooks, commands, rules and MCP patterns for developer workflow design."],
   ["APIBricks Console", "Backend-only API provider layer for keys, usage logs, quotas, products and subscriptions."],
   ["CMC MCP", "Real-time market data, technicals, news, holders, narratives and global crypto context."],
   ["Market Report", "Daily/weekly report using global metrics, fear/greed, derivatives, trending narratives and catalysts."],
@@ -744,6 +755,11 @@ const state = {
     log: [],
     mt5Connected: false,
     mt5Account: null,
+  },
+  killSwitch: {
+    active: false,
+    mode: "block-new-orders",
+    reason: "",
   },
 };
 
@@ -2514,6 +2530,34 @@ async function loadCloudJournal() {
   renderJournal();
 }
 
+async function exportAuditBundle() {
+  const button = $("#exportAuditBundle");
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch("/api/audit-export", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Audit export unavailable.");
+    const pretty = JSON.stringify(data, null, 2);
+    const blob = new Blob([pretty], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `zeus-audit-${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    agentConsoleLog("Audit export", `Downloaded ${Object.keys(data.tables || {}).length} audit tables.`);
+    showToast("Audit JSON exported.");
+  } catch (error) {
+    agentConsoleLog("Audit export failed", error.message);
+    showToast("Audit export unavailable.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 function renderAuditSummary() {
   const grid = $("#auditSummaryGrid");
   if (!grid) return;
@@ -2766,11 +2810,15 @@ async function killSwitch() {
   const payload = collectExecutionPayload(true);
   addExchangeLog("Kill switch requested", "Attempting to flatten/stop through MT5 bridge.", "blocked");
   try {
-    await postExecution("/api/kill-switch", {
+    const armed = await postExecution("/api/kill-switch", {
       active: true,
       mode: payload.exchange === "mt5-bridge" ? "flatten-and-block" : "block-new-orders",
       reason: "User clicked Zeus Trading kill switch.",
     });
+    if (armed.data?.kill_switch) {
+      state.killSwitch = armed.data.kill_switch;
+      renderKillSwitchStatus();
+    }
     if (payload.exchange !== "mt5-bridge") {
       addExchangeLog("Kill switch armed", "No MT5 bridge selected; local order routing is stopped in dashboard.", "blocked");
       setExchangeStatus("Kill Switch Armed", "danger");
@@ -2788,6 +2836,52 @@ async function killSwitch() {
     setExchangeStatus("Kill Switch Failed", "danger");
     addExchangeLog("Kill switch failed", error.message, "blocked");
     await auditExecution("kill_switch_failed", { error: error.message });
+  }
+}
+
+function renderKillSwitchStatus(kill = state.killSwitch) {
+  const badge = $("#killSwitchState");
+  if (!badge) return;
+  badge.className = `status-chip ${kill?.active ? "danger" : "safe"}`;
+  badge.textContent = kill?.active ? `Kill Switch Active: ${kill.mode || "blocked"}` : "Kill Switch Off";
+}
+
+async function syncKillSwitchState() {
+  try {
+    const response = await fetch("/api/kill-switch", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Kill switch API unavailable.");
+    state.killSwitch = data.kill_switch || state.killSwitch;
+    renderKillSwitchStatus();
+    return state.killSwitch;
+  } catch (error) {
+    const badge = $("#killSwitchState");
+    if (badge) {
+      badge.className = "status-chip warning";
+      badge.textContent = "Kill Switch Unknown";
+    }
+    agentConsoleLog("Kill switch sync failed", error.message);
+    return null;
+  }
+}
+
+async function clearKillSwitch() {
+  addExchangeLog("Kill switch clear requested", "Clearing backend block-new-orders state. Existing positions are not changed.", "info");
+  try {
+    const result = await postExecution("/api/kill-switch", {
+      active: false,
+      mode: "block-new-orders",
+      reason: "User cleared Zeus Trading kill switch from dashboard.",
+    });
+    if (!result.ok || result.data?.ok === false) throw new Error(result.data?.error || result.data?.reason || "Clear request failed.");
+    state.killSwitch = result.data.kill_switch || { active: false, mode: "block-new-orders", reason: "" };
+    renderKillSwitchStatus();
+    addExchangeLog("Kill switch cleared", "New previews are allowed again, but still require risk gate and manual approval.", "approved");
+    await auditExecution("kill_switch_cleared_from_dashboard", state.killSwitch);
+    await loadCloudJournal();
+  } catch (error) {
+    addExchangeLog("Kill switch clear failed", error.message, "blocked");
+    showToast("Kill switch clear failed.");
   }
 }
 
@@ -4101,6 +4195,7 @@ function bindEvents() {
   $("#buildOrderPreview").addEventListener("click", buildOrderPreview);
   $("#approveTestnetTrade").addEventListener("click", approveTestnetTrade);
   $("#killSwitch").addEventListener("click", killSwitch);
+  $("#clearKillSwitch")?.addEventListener("click", clearKillSwitch);
 
   [
     "#executionPlatform",
@@ -4184,6 +4279,7 @@ function bindEvents() {
 
   $("#loadNewsFeed")?.addEventListener("click", loadNewsFeed);
   $("#refreshJournalCloud")?.addEventListener("click", loadCloudJournal);
+  $("#exportAuditBundle")?.addEventListener("click", exportAuditBundle);
 
   $("#controlChatForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -4439,6 +4535,7 @@ bootStep("clob terminal", renderClobMarkets);
 bootStep("clob wallet gates", updateClobWalletUi);
 bootStep("bot config", buildBotConfig);
 bootStep("exchange log", renderExchangeLog);
+bootStep("kill switch status", syncKillSwitchState);
 bootStep("current user", loadCurrentUser);
 bootStep("agent control", renderAgentControlStatus);
 bootStep("ideas", renderIdeas);

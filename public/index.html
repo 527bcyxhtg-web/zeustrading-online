@@ -523,6 +523,7 @@
                     Connector
                     <select id="connectorSelect">
                       <option value="agentscope-runtime">AgentScope Multi-Agent Runtime</option>
+                      <option value="everything-claude-code">Everything Claude Code Toolkit</option>
                       <option value="apibricks-console">APIBricks Console + API Keys</option>
                       <option value="pionex-bot">Pionex BTC/USDT Bot</option>
                       <option value="cmc-agent-skills">CoinMarketCap Agent Skills</option>
@@ -735,6 +736,8 @@
                   <button id="buildOrderPreview" class="primary-action" type="button">Build MT5 Preview</button>
                   <button id="approveTestnetTrade" class="secondary-action" type="button" disabled>Approve Live Order</button>
                   <button id="killSwitch" class="danger-action" type="button">Kill Switch</button>
+                  <button id="clearKillSwitch" class="secondary-action" type="button">Clear Kill Switch</button>
+                  <span id="killSwitchState" class="status-chip warning">Kill Switch Unknown</span>
                 </div>
 
                 <div class="exchange-status-grid">
@@ -1327,6 +1330,7 @@
                 </div>
                 <div class="journal-actions">
                   <button id="refreshJournalCloud" class="secondary-action" type="button">Sync Cloud Audit</button>
+                  <button id="exportAuditBundle" class="secondary-action" type="button">Export Audit JSON</button>
                   <button id="addJournal" class="secondary-action" type="button">Add Note</button>
                 </div>
               </div>
@@ -1500,6 +1504,7 @@
                 <a href="https://www.pionex.com/en/trade/BTC_USDT/Bot" target="_blank" rel="noreferrer">Pionex BTC/USDT Bot</a>
                 <a href="https://agentscope.io/" target="_blank" rel="noreferrer">AgentScope</a>
                 <a href="https://docs.agentscope.io/basic-concepts/agent" target="_blank" rel="noreferrer">AgentScope Docs</a>
+                <a href="https://github.com/arabicapp/everything-claude-code" target="_blank" rel="noreferrer">Everything Claude Code Toolkit</a>
                 <a href="https://console.apibricks.io/team/54a30dc6-46dc-4dac-93a7-72ad3f4288ee" target="_blank" rel="noreferrer">APIBricks Console</a>
                 <a href="https://www.apibricks.io/platform/docs/customer-portal/billing" target="_blank" rel="noreferrer">APIBricks Docs</a>
                 <a href="https://coinmarketcap.com/api/agent/" target="_blank" rel="noreferrer">CoinMarketCap for Agent</a>
