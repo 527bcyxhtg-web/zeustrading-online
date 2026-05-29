@@ -14,6 +14,23 @@ Dashboard URL:
 http://127.0.0.1:8789
 ```
 
+n8n/VPS health check aliases:
+
+```text
+GET /health
+GET /status
+```
+
+Order routes:
+
+```text
+POST /order/preview
+POST /order/submit
+```
+
+The legacy `/send_order` route is intentionally blocked. n8n must call
+`/order/preview` first and live submit must still pass Zeus manual approval.
+
 ## Live Mode
 
 By default the bridge is safe: it previews and journals but will not submit live orders.

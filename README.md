@@ -186,6 +186,30 @@ open/logged-in MT5 terminal plus:
 MT5_ENABLE_LIVE=true MT5_REQUIRE_TERMINAL=true uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
 ```
 
+## n8n Protected Scanner
+
+Import this workflow into n8n for a safe BTCUSD EMA50 scanner:
+
+```text
+integrations/n8n/btcusd-ema50-zeus-protected.json
+```
+
+It does not store Telegram secrets in n8n. It calls Zeus backend routes:
+
+```text
+POST https://zeustrading.online/api/agentscope/orchestrate
+POST https://zeustrading.online/api/telegram/alert
+```
+
+If `MT5_BRIDGE_URL` is configured, it can also call:
+
+```text
+POST http://127.0.0.1:8789/order/preview
+```
+
+It never calls live submit directly. Live MT5 execution still requires Zeus
+risk gate, SL/TP, manual approval token, audit log, and kill switch readiness.
+
 Production backend env must include at least:
 
 ```text

@@ -258,6 +258,12 @@ def health() -> dict[str, Any]:
     }
 
 
+@app.get("/status")
+def status() -> dict[str, Any]:
+    """Compatibility alias for simple n8n/VPS health checks."""
+    return health()
+
+
 @app.get("/account")
 def account() -> dict[str, Any]:
     snapshot = account_snapshot()
@@ -343,6 +349,24 @@ def order_submit(request: SubmitRequest) -> dict[str, Any]:
         shutdown_terminal()
 
 
+@app.post("/send_order")
+def deprecated_send_order(payload: dict[str, Any]) -> dict[str, Any]:
+    """Reject unsafe legacy order routes.
+
+    n8n and browser agents must use /order/preview first, then Zeus manual
+    approval and /order/submit with an approval token. This route exists only
+    to make unsafe examples fail loudly instead of accidentally routing live.
+    """
+    write_journal("deprecated_send_order_blocked", {"request": payload, "reason": "Use /order/preview and /order/submit."})
+    raise HTTPException(
+        status_code=423,
+        detail={
+            "ok": False,
+            "reason": "Direct /send_order is blocked. Use /order/preview, Zeus risk gate, manual approval, then /order/submit.",
+        },
+    )
+
+
 @app.post("/positions/flatten")
 def flatten_positions(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     if not LIVE_ENABLED:
@@ -395,4 +419,3 @@ def journal(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
     lines = JOURNAL_PATH.read_text(encoding="utf-8").splitlines()[-limit:]
     entries = [json.loads(line) for line in lines if line.strip()]
     return {"ok": True, "entries": entries}
-

@@ -1,0 +1,199 @@
+{
+  "name": "Zeus Protected BTCUSD EMA50 Scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "hours": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7&interval=hourly",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-history",
+      "name": "Fetch BTC hourly history",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prices = $input.first().json.prices || [];\nconst period = 50;\nif (prices.length < period + 1) {\n  return [{ json: { ok: false, reason: 'Not enough hourly candles', signal: false } }];\n}\n\nconst closes = prices.map((row) => Number(row[1])).filter((value) => Number.isFinite(value));\nlet ema = closes.slice(0, period).reduce((sum, value) => sum + value, 0) / period;\nconst multiplier = 2 / (period + 1);\nfor (let index = period; index < closes.length; index += 1) {\n  ema = (closes[index] - ema) * multiplier + ema;\n}\n\nconst currentPrice = closes.at(-1);\nconst previousPrice = closes.at(-2);\nconst atrProxy = Math.max(currentPrice * 0.01, Math.abs(currentPrice - previousPrice) * 2);\nconst signal = currentPrice > ema;\nconst stopLoss = Number((currentPrice - atrProxy).toFixed(2));\nconst takeProfit = Number((currentPrice + atrProxy * 2).toFixed(2));\nconst rr = Number(((takeProfit - currentPrice) / Math.max(currentPrice - stopLoss, 1)).toFixed(2));\n\nreturn [{\n  json: {\n    ok: true,\n    symbol: 'BTCUSD',\n    direction: 'LONG',\n    setup: 'BTCUSD hourly close above EMA50',\n    current_price: Number(currentPrice.toFixed(2)),\n    ema50: Number(ema.toFixed(2)),\n    signal,\n    entry: Number(currentPrice.toFixed(2)),\n    stopLoss,\n    takeProfit,\n    rewardRisk: rr,\n    riskPercent: 0.25,\n    spreadPercent: 0.03,\n    newsRisk: 'low',\n    timestamp: new Date().toISOString(),\n    note: signal ? 'Candidate only. Zeus risk gate and manual approval are still required.' : 'No candidate: BTCUSD is not above EMA50.'\n  }\n}];"
+      },
+      "id": "calculate-ema50",
+      "name": "Calculate EMA50 candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.signal }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-candidate",
+      "name": "Candidate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        930,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/agentscope/orchestrate",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"symbol\": $json.symbol,\n  \"direction\": $json.direction,\n  \"setup\": $json.setup,\n  \"entry\": $json.entry,\n  \"stopLoss\": $json.stopLoss,\n  \"takeProfit\": $json.takeProfit,\n  \"riskPercent\": $json.riskPercent,\n  \"spreadPercent\": $json.spreadPercent,\n  \"newsRisk\": $json.newsRisk,\n  \"runtime\": \"n8n\",\n  \"authority\": \"manual-approval\",\n  \"source\": \"n8n-btcusd-ema50\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "zeus-agentscope-review",
+      "name": "Zeus AgentScope risk review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1160,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/telegram/alert",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"message\": \"BTCUSD EMA50 candidate\\nDecision: \" + $json.cycle.final_decision + \"\\nPreview ready: \" + $json.cycle.preview.preview_ready + \"\\nApproval required: \" + $json.cycle.preview.approval_required + \"\\nSource: n8n protected scanner\\n\\nNo blind live execution. Open Zeus dashboard for manual approval.\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "zeus-telegram-alert",
+      "name": "Send Zeus Telegram alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1400,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MT5_BRIDGE_URL || 'http://127.0.0.1:8789' }}/order/preview",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"exchange\": \"mt5-bridge\",\n  \"mode\": \"protected-live\",\n  \"symbol\": $json.cycle.preview.mt5_payload.symbol,\n  \"side\": \"BUY\",\n  \"entry\": $json.cycle.preview.mt5_payload.entry,\n  \"stopLoss\": $json.cycle.preview.mt5_payload.stop_loss,\n  \"takeProfit\": $json.cycle.preview.mt5_payload.take_profit,\n  \"quantity\": $json.cycle.preview.mt5_payload.lot_size,\n  \"riskAmount\": $json.cycle.preview.mt5_payload.estimated_loss,\n  \"rewardRisk\": $json.cycle.preview.mt5_payload.rr_ratio,\n  \"approved\": $json.cycle.final_decision === 'READY_FOR_MANUAL_APPROVAL',\n  \"blockers\": $json.cycle.agents.find(a => a.agent === 'Supervisor Agent').exact_blockers || []\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "mt5-preview-only",
+      "name": "Optional MT5 preview only",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1640,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "Fetch BTC hourly history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BTC hourly history": {
+      "main": [
+        [
+          {
+            "node": "Calculate EMA50 candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate EMA50 candidate": {
+      "main": [
+        [
+          {
+            "node": "Candidate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Candidate?": {
+      "main": [
+        [
+          {
+            "node": "Zeus AgentScope risk review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Zeus AgentScope risk review": {
+      "main": [
+        [
+          {
+            "node": "Send Zeus Telegram alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Optional MT5 preview only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
