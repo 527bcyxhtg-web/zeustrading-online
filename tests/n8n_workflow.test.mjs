@@ -23,16 +23,23 @@ assert.match(serialized, /\/health/);
 assert.match(serialized, /bridge_ready/);
 assert.match(serialized, /demo_live_ready/);
 assert.match(serialized, /ETHUSD/);
-assert.match(serialized, /EMA20_PULLBACK/);
-assert.match(serialized, /n8n-generalized-scanner/);
+assert.match(serialized, /EMA_RSI_MACD_VOLUME/);
+assert.match(serialized, /RSI_RECLAIM/);
+assert.match(serialized, /price_above_ema/);
+assert.match(serialized, /rsi_above/);
+assert.match(serialized, /macd_bullish/);
+assert.match(serialized, /volume_spike/);
+assert.match(serialized, /n8n-indicator-scanner/);
 assert.match(serialized, /api\/agentscope\/orchestrate/);
 assert.match(serialized, /api\/telegram\/alert/);
 assert.match(serialized, /\/order\/preview/);
-assert.doesNotMatch(serialized, /YOUR_TELEGRAM_BOT_TOKEN|YOUR_CHAT_ID|\/send_order|\/order\/submit/);
+assert.doesNotMatch(serialized, /YOUR_TELEGRAM_BOT_TOKEN|YOUR_CHAT_ID|OPENROUTER_API_KEY|api\/v1\/chat\/completions|\/send_order|\/order\/submit/);
 assert.match(serialized, /manual-approval/);
 
 assert.match(readme, /Safety Contract/);
 assert.match(readme, /stops before CoinGecko scanning/);
+assert.match(readme, /EMA, RSI, MACD/);
+assert.match(readme, /OpenRouter\/API secrets stay in/);
 assert.match(readme, /MT5 receives preview requests only/);
 
 console.log("n8n_workflow.test.mjs passed");

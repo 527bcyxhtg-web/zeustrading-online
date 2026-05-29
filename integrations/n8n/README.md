@@ -18,7 +18,8 @@ What it does:
    not demo-live ready.
 4. Loads scanner strategies from the workflow config.
 5. Fetches hourly crypto candles from CoinGecko only after the bridge passes.
-6. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA trend variants.
+6. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA, RSI, MACD,
+   and volume-spike variants.
 7. If a strategy creates a candidate, sends it to:
 
 ```text
@@ -50,13 +51,17 @@ The workflow expects the bridge health response used by Zeus MT5 bridge:
 `guard.ok`, and `guard.live_account_blockers`.
 
 Strategy config lives in the `Load scanner strategies` node. Add symbols there
-instead of copying the whole workflow.
+instead of copying the whole workflow. Each strategy can define `conditions`
+such as `price_above_ema`, `price_below_ema`, `rsi_above`, `rsi_below`,
+`macd_bullish`, `macd_bearish`, and `volume_spike`.
 
 ## Safety Contract
 
 - The workflow creates candidates only.
 - The workflow stops before CoinGecko scanning when the MT5 bridge is not ready.
 - Multiple symbols/strategies are scanned from one config node.
+- Indicator data is passed to Zeus AgentScope; OpenRouter/API secrets stay in
+  the Zeus backend, not inside n8n.
 - Telegram alerts are not trade instructions.
 - MT5 receives preview requests only.
 - Live submit still requires Zeus risk gate, manual approval token, SL/TP, kill switch availability, and audit logging.
