@@ -194,11 +194,22 @@ curl -X POST http://127.0.0.1:8789/paper/reset -H "Content-Type: application/jso
 ```
 
 Set `MT5_KILL_TOKEN` on a VPS to require `X-Zeus-Token` for admin guard routes.
-Real MT5 live routing requires an open/logged-in MT5 terminal plus:
+Demo-live MT5 routing requires an open/logged-in MT5 terminal or explicit demo
+credentials through environment variables:
 
 ```bash
-MT5_ENABLE_LIVE=true MT5_REQUIRE_TERMINAL=true uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
+MT5_ENABLE_LIVE=true \
+MT5_REQUIRE_TERMINAL=true \
+MT5_REQUIRE_DEMO_ACCOUNT=true \
+MT5_ALLOW_REAL_ACCOUNT=false \
+MT5_LOGIN=<demo-login> \
+MT5_PASSWORD=<demo-password> \
+MT5_SERVER=<broker-demo-server> \
+uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
 ```
+
+The bridge never journals the MT5 password. If MT5 reports a real account,
+live submit is blocked unless `MT5_ALLOW_REAL_ACCOUNT=true` is deliberately set.
 
 ## n8n Protected Scanner
 

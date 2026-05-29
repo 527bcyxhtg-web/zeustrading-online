@@ -31,6 +31,8 @@ JOURNAL_PATH = Path(os.getenv("MT5_BRIDGE_JOURNAL", "logs/mt5_bridge_journal.jso
 GUARD_STATE_PATH = Path(os.getenv("MT5_GUARD_STATE", "logs/mt5_guard_state.json"))
 LIVE_ENABLED = os.getenv("MT5_ENABLE_LIVE", "false").lower() == "true"
 REQUIRE_MT5 = os.getenv("MT5_REQUIRE_TERMINAL", "false").lower() == "true"
+ALLOW_REAL_ACCOUNT = os.getenv("MT5_ALLOW_REAL_ACCOUNT", "false").lower() == "true"
+REQUIRE_DEMO_ACCOUNT = os.getenv("MT5_REQUIRE_DEMO_ACCOUNT", "true").lower() == "true"
 MAX_SPREAD_POINTS = float(os.getenv("MT5_MAX_SPREAD_POINTS", "80"))
 GUARD_INITIAL_BALANCE = float(os.getenv("MT5_GUARD_INITIAL_BALANCE", "100000"))
 GUARD_DAILY_LOSS_LIMIT_PERCENT = float(os.getenv("MT5_GUARD_DAILY_LOSS_LIMIT_PERCENT", "0.03"))
@@ -174,6 +176,7 @@ def guard_summary(account: dict[str, Any] | None = None) -> dict[str, Any]:
         "daily_loss_buffer_remaining": round(max(daily_loss_buffer, 0), 2),
         "static_drawdown_floor": round(static_floor, 2),
         "max_drawdown_buffer_remaining": round(max(max_drawdown_buffer, 0), 2),
+        "live_account_blockers": live_account_blockers(account),
     }
 
 
@@ -229,10 +232,74 @@ def mt5_available() -> bool:
     return mt5 is not None
 
 
+def mt5_initialize_kwargs() -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    path = os.getenv("MT5_PATH", "").strip()
+    login = os.getenv("MT5_LOGIN", "").strip()
+    password = os.getenv("MT5_PASSWORD", "")
+    server = os.getenv("MT5_SERVER", "").strip()
+    timeout = os.getenv("MT5_TIMEOUT_MS", "").strip()
+    portable = os.getenv("MT5_PORTABLE", "").strip().lower()
+
+    if path:
+        kwargs["path"] = path
+    if login:
+        kwargs["login"] = int(login)
+    if password:
+        kwargs["password"] = password
+    if server:
+        kwargs["server"] = server
+    if timeout:
+        kwargs["timeout"] = int(timeout)
+    if portable in {"true", "1", "yes"}:
+        kwargs["portable"] = True
+    return kwargs
+
+
+def mt5_connection_config() -> dict[str, Any]:
+    return {
+        "path_configured": bool(os.getenv("MT5_PATH", "").strip()),
+        "login_configured": bool(os.getenv("MT5_LOGIN", "").strip()),
+        "server_configured": bool(os.getenv("MT5_SERVER", "").strip()),
+        "password_configured": bool(os.getenv("MT5_PASSWORD", "")),
+        "require_demo_account": REQUIRE_DEMO_ACCOUNT,
+        "allow_real_account": ALLOW_REAL_ACCOUNT,
+    }
+
+
 def ensure_terminal() -> bool:
     if not mt5_available():
         return False
-    return bool(mt5.initialize())
+    try:
+        return bool(mt5.initialize(**mt5_initialize_kwargs()))
+    except Exception:
+        return False
+
+
+def account_trade_mode_label(mode: Any) -> str:
+    if mode is None or not mt5_available():
+        return "unknown"
+    labels = {
+        getattr(mt5, "ACCOUNT_TRADE_MODE_DEMO", object()): "demo",
+        getattr(mt5, "ACCOUNT_TRADE_MODE_CONTEST", object()): "contest",
+        getattr(mt5, "ACCOUNT_TRADE_MODE_REAL", object()): "real",
+    }
+    return labels.get(mode, "unknown")
+
+
+def live_account_blockers(account: dict[str, Any]) -> list[str]:
+    if not LIVE_ENABLED:
+        return []
+    if not account.get("connected"):
+        return ["MT5 terminal/account is not connected."]
+
+    trade_mode = account.get("trade_mode_label", "unknown")
+    blockers = []
+    if REQUIRE_DEMO_ACCOUNT and trade_mode not in {"demo", "contest"}:
+        blockers.append(f"Live submit requires a demo/contest MT5 account. Current mode: {trade_mode}.")
+    if trade_mode == "real" and not ALLOW_REAL_ACCOUNT:
+        blockers.append("Real MT5 account detected. Set MT5_ALLOW_REAL_ACCOUNT=true only after full live unlock review.")
+    return blockers
 
 
 def shutdown_terminal() -> None:
@@ -306,6 +373,8 @@ def account_snapshot() -> dict[str, Any]:
             "balance": None,
             "equity": None,
             "currency": None,
+            "trade_mode": None,
+            "trade_mode_label": "unknown",
             "source": "safe-fallback",
         }
 
@@ -320,6 +389,8 @@ def account_snapshot() -> dict[str, Any]:
             "balance": float(info.balance),
             "equity": float(info.equity),
             "currency": info.currency,
+            "trade_mode": getattr(info, "trade_mode", None),
+            "trade_mode_label": account_trade_mode_label(getattr(info, "trade_mode", None)),
             "source": "mt5",
         }
     finally:
@@ -367,6 +438,8 @@ def build_preview(preview: PreviewRequest) -> dict[str, Any]:
     quote = get_quote(symbol)
     guard = guard_summary()
     blockers.extend(guard["blockers"])
+    if LIVE_ENABLED:
+        blockers.extend(guard["live_account_blockers"])
 
     if preview.exchange != "mt5-bridge":
         blockers.append("Bridge accepts only mt5-bridge previews.")
@@ -431,6 +504,7 @@ def health() -> dict[str, Any]:
         "version": BRIDGE_VERSION,
         "live_enabled": LIVE_ENABLED,
         "mt5_module_available": mt5_available(),
+        "mt5_connection_config": mt5_connection_config(),
         "account": account,
         "guard": guard,
         "timestamp": utc_now(),
@@ -547,6 +621,13 @@ def order_submit(request: SubmitRequest) -> dict[str, Any]:
         }
         payload["journal_id"] = write_journal("order_submit_dry_run", payload)
         return payload
+
+    live_account = account_snapshot()
+    account_blockers = live_account_blockers(live_account)
+    if account_blockers:
+        payload = {"ok": False, "reason": "MT5 account safety check blocked live submit.", "account": live_account, "blockers": account_blockers, "preview": preview_result}
+        payload["journal_id"] = write_journal("live_account_blocked", payload)
+        raise HTTPException(status_code=423, detail=payload)
 
     if not mt5_available() or not ensure_terminal():
         raise HTTPException(status_code=503, detail="MetaTrader 5 terminal is not available for live submit.")
