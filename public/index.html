@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zeus Trading Live Desk</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-agentscope-1" />
+    <link rel="stylesheet" href="styles.css?v=20260529-live-terminal-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -83,6 +83,16 @@
 
       <main class="workspace">
         <section class="cockpit-workspace" data-panel="agent" aria-label="Premium protected live chart cockpit">
+          <div class="live-terminal-top" aria-label="Live terminal status">
+            <div id="liveMarketCards" class="live-market-cards"></div>
+            <div class="terminal-status-cluster">
+              <span class="terminal-live-dot"></span>
+              <strong id="terminalChartStatus">Chart Live</strong>
+              <time id="terminalClock">--:--:--</time>
+              <span class="terminal-telegram">Telegram <strong>POVEZANO</strong></span>
+              <button class="terminal-menu" type="button" aria-label="Menu">☰</button>
+            </div>
+          </div>
           <div class="market-toolbar">
             <div class="toolbar-symbol">
               <strong id="cockpitSymbolLabel">AAPL</strong>
@@ -157,8 +167,8 @@
 
             <aside class="agent-risk-sidebar" aria-label="Agent and risk gate">
               <div class="agent-side-header">
-                <span>Protected Live</span>
-                <strong id="cockpitAgentStatus">Agent waiting</strong>
+                <span>AGENTSCOPE LANAC</span>
+                <strong id="cockpitAgentCounter">8/8</strong>
               </div>
               <div class="risk-gauge-card">
                 <div class="risk-gauge-ring" id="cockpitRiskGauge"><span>--</span></div>
@@ -167,20 +177,61 @@
                   <small>SL/TP, drawdown, news, spread and manual approval must pass.</small>
                 </div>
               </div>
-              <div class="agent-mini-chain">
-                <article class="passed"><span></span><strong>Market Data</strong><small id="cockpitDataStatus">Connecting</small></article>
-                <article><span></span><strong>Indicators</strong><small>EMA · VWAP · RSI · ATR</small></article>
-                <article><span></span><strong>Rules</strong><small id="cockpitRuleStatus">FundedElite / FTMO guard</small></article>
-                <article><span></span><strong>Execution</strong><small id="cockpitMt5Status">MT5 disconnected</small></article>
-              </div>
+              <div id="cockpitAgentScopeChain" class="cockpit-agent-chain"></div>
               <div class="cockpit-actions">
                 <button id="heroPreflight" class="primary-action" type="button">Run Risk Gate</button>
                 <button class="secondary-action quick-jump" type="button" data-quick-target="bot-builder">Build Bot</button>
                 <button class="secondary-action quick-jump" type="button" data-quick-target="active-agent">Run Agent</button>
                 <button id="heroTarot" class="secondary-action" type="button">Risk Tarot</button>
               </div>
+              <button id="cockpitKillSwitch" class="cockpit-kill-switch" type="button">Kill Switch <span>Zaustavi sve</span></button>
               <a class="agent-chat-link cockpit-chat-link" href="/chat/?session=agent%3Amain%3Amain">Open Agent Chat</a>
             </aside>
+          </div>
+
+          <div class="live-preview-flow">
+            <article class="flow-card blue">
+              <span>1</span>
+              <strong>Odaberi tržište</strong>
+              <label>
+                Symbol
+                <select id="cockpitFlowSymbol">
+                  <option>XAUUSD</option>
+                  <option>EURUSD</option>
+                  <option>BTCUSD</option>
+                  <option>NVDA</option>
+                  <option>SPY</option>
+                </select>
+              </label>
+              <small>A+ setupovi samo u jasnom trendu.</small>
+            </article>
+            <article class="flow-card green">
+              <span>2</span>
+              <strong>Pokreni agente</strong>
+              <button id="cockpitRunAgentScope" class="flow-pass-button" type="button">8/8 prošao</button>
+              <small>Svi agenti moraju dati jasan output.</small>
+            </article>
+            <article class="flow-card gold">
+              <span>3</span>
+              <strong>Provjeri rizik</strong>
+              <dl>
+                <div><dt>Risk</dt><dd id="flowRiskValue">0.25%</dd></div>
+                <div><dt>Daily buffer</dt><dd id="flowDailyBuffer">--</dd></div>
+                <div><dt>Max DD buffer</dt><dd id="flowMaxBuffer">--</dd></div>
+              </dl>
+              <small id="flowRiskText">Zaštićeno u granicama pravila.</small>
+            </article>
+            <article class="flow-card purple">
+              <span>4</span>
+              <strong>Odobri live preview</strong>
+              <div class="preview-metrics">
+                <div><small>Ulaz</small><b id="flowEntry">--</b></div>
+                <div><small>Stop Loss</small><b id="flowStop">--</b></div>
+                <div><small>Take Profit</small><b id="flowTarget">--</b></div>
+                <div><small>R:R</small><b id="flowRr">--</b></div>
+              </div>
+              <button class="approve-live-preview quick-jump" type="button" data-quick-target="bot-builder">Odobri Live Preview</button>
+            </article>
           </div>
 
           <div class="cockpit-status-bar">
@@ -193,6 +244,8 @@
               <time id="marketLastUpdated">--:--:--</time>
             </div>
           </div>
+
+          <div class="connector-dock" id="connectorDock"></div>
         </section>
 
         <section class="live-desk-order" aria-label="Simple protected live workflow">

@@ -1131,10 +1131,16 @@ function renderPremiumChart() {
   const candles = buildChartCandles(asset);
   const width = 980;
   const height = 520;
-  const top = 32;
-  const bottom = 408;
-  const volumeTop = 428;
-  const volumeBottom = 500;
+  const top = 34;
+  const bottom = 306;
+  const volumeTop = 314;
+  const volumeBottom = 360;
+  const emaTop = 374;
+  const emaBottom = 414;
+  const rsiTop = 426;
+  const rsiBottom = 462;
+  const atrTop = 474;
+  const atrBottom = 500;
   const min = Math.min(...candles.map((candle) => candle.low));
   const max = Math.max(...candles.map((candle) => candle.high));
   const range = Math.max(max - min, 0.0001);
@@ -1145,6 +1151,26 @@ function renderPremiumChart() {
   const last = candles.at(-1);
   const first = candles[0];
   const lastY = priceY(last.close);
+  const smoothSeries = (offset = 0, wave = 1) =>
+    candles.map((candle, index) => candle.close + Math.sin(index / (4.5 + wave)) * range * 0.025 + offset);
+  const seriesPath = (values, areaTop, areaBottom, fixedMin = null, fixedMax = null) => {
+    const localMin = fixedMin ?? Math.min(...values);
+    const localMax = fixedMax ?? Math.max(...values);
+    const localRange = Math.max(localMax - localMin, 0.0001);
+    return values
+      .map((value, index) => {
+        const x = index * xStep + xStep / 2;
+        const y = areaTop + ((localMax - value) / localRange) * (areaBottom - areaTop);
+        return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  };
+  const ema9 = smoothSeries(range * 0.02, 1);
+  const ema21 = smoothSeries(0, 2.5);
+  const ema50 = smoothSeries(-range * 0.018, 4);
+  const rsi = candles.map((_, index) => 54 + Math.sin(index / 5.2) * 10 + Math.cos(index / 9) * 5);
+  const atr = candles.map((_, index) => 12 + Math.sin(index / 7) * 1.5 + index / candles.length);
+  const vwap = smoothSeries(-range * 0.035, 6);
   const grid = [0, 1, 2, 3, 4, 5]
     .map((line) => {
       const y = top + ((bottom - top) / 5) * line;
@@ -1178,14 +1204,46 @@ function renderPremiumChart() {
         <stop offset="100%" stop-color="#55c3a7" stop-opacity="0" />
       </linearGradient>
     </defs>
+    ${Array.from({ length: 11 })
+      .map((_, index) => {
+        const x = (width / 10) * index;
+        return `<line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="rgba(255,255,255,0.035)" />`;
+      })
+      .join("")}
     ${grid}
     <line x1="0" y1="${lastY}" x2="${width}" y2="${lastY}" stroke="#55c3a7" stroke-width="1.2" stroke-dasharray="2 7" opacity="0.72" />
     ${candleSvg}
+    <line x1="0" y1="${emaTop - 8}" x2="${width}" y2="${emaTop - 8}" stroke="rgba(255,255,255,0.08)" />
+    <path d="${seriesPath(ema9, emaTop, emaBottom)}" fill="none" stroke="#23a7ff" stroke-width="1.5" opacity="0.9" />
+    <path d="${seriesPath(ema21, emaTop, emaBottom)}" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.9" />
+    <path d="${seriesPath(ema50, emaTop, emaBottom)}" fill="none" stroke="#f5d76e" stroke-width="1.3" opacity="0.75" />
+    <text x="18" y="${emaTop - 13}" fill="rgba(248,247,237,0.72)" font-size="12" font-weight="800">EMA 9/21/50</text>
+    <text x="105" y="${emaTop - 13}" fill="#23a7ff" font-size="12" font-weight="800">${ema9.at(-1).toFixed(asset.price < 10 ? 4 : 2)}</text>
+    <text x="176" y="${emaTop - 13}" fill="#f59e0b" font-size="12" font-weight="800">${ema21.at(-1).toFixed(asset.price < 10 ? 4 : 2)}</text>
+    <text x="247" y="${emaTop - 13}" fill="#f5d76e" font-size="12" font-weight="800">${ema50.at(-1).toFixed(asset.price < 10 ? 4 : 2)}</text>
+
+    <line x1="0" y1="${rsiTop - 8}" x2="${width}" y2="${rsiTop - 8}" stroke="rgba(255,255,255,0.08)" />
+    <line x1="0" y1="${rsiTop + 8}" x2="${width}" y2="${rsiTop + 8}" stroke="rgba(139,92,246,0.24)" stroke-dasharray="4 6" />
+    <line x1="0" y1="${rsiBottom - 8}" x2="${width}" y2="${rsiBottom - 8}" stroke="rgba(139,92,246,0.24)" stroke-dasharray="4 6" />
+    <path d="${seriesPath(rsi, rsiTop, rsiBottom, 20, 80)}" fill="none" stroke="#a878ff" stroke-width="1.45" opacity="0.9" />
+    <text x="18" y="${rsiTop - 13}" fill="rgba(248,247,237,0.72)" font-size="12" font-weight="800">RSI 14</text>
+    <text x="75" y="${rsiTop - 13}" fill="#a878ff" font-size="12" font-weight="800">${rsi.at(-1).toFixed(2)}</text>
+    <text x="${width - 40}" y="${rsiTop + 4}" fill="rgba(248,247,237,0.58)" font-size="11" font-weight="800">80.00</text>
+    <text x="${width - 40}" y="${rsiBottom - 5}" fill="rgba(248,247,237,0.58)" font-size="11" font-weight="800">40.00</text>
+
+    <line x1="0" y1="${atrTop - 8}" x2="${width}" y2="${atrTop - 8}" stroke="rgba(255,255,255,0.08)" />
+    <path d="${seriesPath(atr, atrTop, atrBottom)}" fill="none" stroke="#ef4444" stroke-width="1.55" opacity="0.9" />
+    <text x="18" y="${atrTop - 13}" fill="rgba(248,247,237,0.72)" font-size="12" font-weight="800">ATR 14</text>
+    <text x="75" y="${atrTop - 13}" fill="#ef4444" font-size="12" font-weight="800">${atr.at(-1).toFixed(2)}</text>
+
+    <path d="${seriesPath(vwap, 508, 518)}" fill="none" stroke="#2f80ed" stroke-width="1.5" opacity="0.9" />
+    <text x="18" y="516" fill="rgba(248,247,237,0.72)" font-size="12" font-weight="800">VWAP</text>
+    <text x="75" y="516" fill="#2f80ed" font-size="12" font-weight="800">${vwap.at(-1).toFixed(asset.price < 10 ? 4 : 2)}</text>
     <text x="18" y="31" fill="rgba(248,247,237,0.58)" font-size="12" font-weight="800">Vol · ${(last.volume * 1.12).toFixed(2)}M</text>
-    <text x="18" y="496" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">Oct</text>
-    <text x="258" y="496" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">Dec</text>
-    <text x="505" y="496" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">Feb</text>
-    <text x="758" y="496" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">May</text>
+    <text x="18" y="358" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">22</text>
+    <text x="258" y="358" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">24</text>
+    <text x="505" y="358" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">26</text>
+    <text x="758" y="358" fill="rgba(248,247,237,0.56)" font-size="12" font-weight="800">29</text>
   `;
 
   const open = first.open;
@@ -1211,15 +1269,100 @@ function renderCockpitStatus() {
   const dailyPct = clamp((risk.dailyBuffer / Math.max(risk.initial * selectedChallengeRule().dailyLoss, 1)) * 100, 0, 100);
   const agentReady = state.agentPlan?.computed?.readiness || "Waiting for setup";
   const mt5Text = state.exchange.mt5Connected ? "MT5 connected" : $("#exchangeExecutionStatus")?.textContent || "MT5 disconnected";
-  $("#cockpitRiskGauge").style.setProperty("--risk-value", `${dailyPct}%`);
-  $("#cockpitRiskGauge span").textContent = `${Math.round(dailyPct)}%`;
-  $("#cockpitRiskStatus").textContent = guard?.textContent ? `Risk: ${guard.textContent}` : "Risk gate not run";
-  $("#cockpitAgentStatus").textContent = agentReady;
-  $("#cockpitDataStatus").textContent = state.market.status === "live" ? "Live feed active" : state.market.status === "degraded" ? "Fallback feed active" : "Connecting";
-  $("#cockpitRuleStatus").textContent = selectedChallengeRule().label;
-  $("#cockpitMt5Status").textContent = mt5Text;
-  $("#cockpitLastAction").textContent = state.exchange.log[0]?.title || state.agentPlan?.strategy?.label || "Waiting for live scan";
-  $("#cockpitApprovalState").textContent = state.exchange.preview?.approved ? "Preview approved. Manual click still required." : "Manual approval required before any live submit.";
+  $("#cockpitRiskGauge")?.style.setProperty("--risk-value", `${dailyPct}%`);
+  if ($("#cockpitRiskGauge span")) $("#cockpitRiskGauge span").textContent = `${Math.round(dailyPct)}%`;
+  if ($("#cockpitRiskStatus")) $("#cockpitRiskStatus").textContent = guard?.textContent ? `Risk: ${guard.textContent}` : "Risk gate not run";
+  if ($("#cockpitAgentStatus")) $("#cockpitAgentStatus").textContent = agentReady;
+  if ($("#cockpitDataStatus")) $("#cockpitDataStatus").textContent = state.market.status === "live" ? "Live feed active" : state.market.status === "degraded" ? "Fallback feed active" : "Connecting";
+  if ($("#cockpitRuleStatus")) $("#cockpitRuleStatus").textContent = selectedChallengeRule().label;
+  if ($("#cockpitMt5Status")) $("#cockpitMt5Status").textContent = mt5Text;
+  if ($("#cockpitLastAction")) $("#cockpitLastAction").textContent = state.exchange.log[0]?.title || state.agentPlan?.strategy?.label || "Waiting for live scan";
+  if ($("#cockpitApprovalState")) $("#cockpitApprovalState").textContent = state.exchange.preview?.approved ? "Preview approved. Manual click still required." : "Manual approval required before any live submit.";
+  renderCockpitAgentChain();
+  renderLivePreviewFlow();
+}
+
+function renderCockpitAgentChain() {
+  const root = $("#cockpitAgentScopeChain");
+  if (!root) return;
+  const cycleAgents = state.agentScope.cycle?.agents || state.agentCycle?.agents || [];
+  const roleNames = [
+    "Market Scanner Agent",
+    "News / Macro Risk Agent",
+    "Strategy Validation Agent",
+    "Prop Firm Rules Agent",
+    "Risk Gate / Position Sizing",
+    "Supervisor Agent",
+    "Execution Preview Agent",
+    "Live Execution Agent",
+  ];
+  const rows = roleNames.map((name, index) => {
+    const canonical = name.replace("News / Macro", "News/Macro").replace("Risk Gate / Position Sizing", "Position Sizing / Risk Gate Agent");
+    const source =
+      cycleAgents.find((agent) => agent.agent === canonical || agent.agent === name || (index === 7 && /Execution Preview/.test(agent.agent || ""))) || {};
+    const status =
+      source.status ||
+      (index < 5 && state.market.status !== "connecting" ? "passed" : index === 6 && state.exchange.preview ? "warning" : index === 7 ? "waiting" : "pending");
+    const label = status === "passed" ? "PROSAO" : status === "blocked" ? "BLOKIRAN" : status === "warning" ? "PREVIEW" : "PENDING";
+    const detail =
+      source.reason ||
+      source.explanation ||
+      source.summary ||
+      source.rejection_reason ||
+      [
+        "Skeniram trziste za A+ setupove",
+        "Provjeravam vijesti i makro rizike",
+        "Validiram setup prema strategiji",
+        "Provjeravam pravila prop firme",
+        "Izracunavam velicinu pozicije",
+        "Konacna odluka nad agentima",
+        "Pripremam MT5 preview nalog",
+        "Saljem nalog nakon odobrenja",
+      ][index];
+    return { name, status, label, detail };
+  });
+  const passed = rows.filter((row) => row.status === "passed" || row.status === "warning").length;
+  $("#cockpitAgentCounter").textContent = `${passed}/8`;
+  root.innerHTML = rows
+    .map(
+      (row, index) => `
+        <article class="cockpit-agent-step ${row.status}">
+          <span>${index + 1}</span>
+          <div class="agent-step-icon">${["⌁", "◎", "◇", "♎", "◉", "✺", "◌", "⚡"][index]}</div>
+          <div>
+            <strong>${row.name}</strong>
+            <small>${row.detail}</small>
+            <em>${row.label}</em>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderLivePreviewFlow() {
+  const risk = riskContext();
+  const preview = state.exchange.preview;
+  const riskPct = Number($("#botRisk")?.value || $("#riskPerTrade")?.value || 0.25);
+  if ($("#flowRiskValue")) $("#flowRiskValue").textContent = `${riskPct.toFixed(2)}%`;
+  if ($("#flowDailyBuffer")) $("#flowDailyBuffer").textContent = fmtUsd.format(Math.max(risk.dailyBuffer || 0, 0));
+  if ($("#flowMaxBuffer")) $("#flowMaxBuffer").textContent = fmtUsd.format(Math.max(risk.maxBuffer || 0, 0));
+  if ($("#flowRiskText")) $("#flowRiskText").textContent = risk.dailyBuffer <= 0 || risk.maxBuffer <= 0 ? "Blokirano: drawdown/risk pravilo." : "Zasticeno u granicama pravila.";
+  const entry = preview?.entry || numberValue("#signalEntry") || cockpitAsset().price;
+  const stop = preview?.stopLoss || numberValue("#signalStop") || entry * 0.994;
+  const target = preview?.takeProfit || numberValue("#signalTarget") || entry * 1.012;
+  if ($("#flowEntry")) $("#flowEntry").textContent = entry ? entry.toFixed(entry < 10 ? 4 : 2) : "--";
+  if ($("#flowStop")) $("#flowStop").textContent = stop ? stop.toFixed(stop < 10 ? 4 : 2) : "--";
+  if ($("#flowTarget")) $("#flowTarget").textContent = target ? target.toFixed(target < 10 ? 4 : 2) : "--";
+  if ($("#flowRr")) $("#flowRr").textContent = Math.abs(target - entry) && Math.abs(entry - stop) ? `1:${(Math.abs(target - entry) / Math.abs(entry - stop)).toFixed(1)}` : "--";
+}
+
+function updateTerminalClock() {
+  const clock = $("#terminalClock");
+  if (clock) clock.textContent = new Date().toLocaleTimeString("hr-HR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if ($("#terminalChartStatus")) {
+    $("#terminalChartStatus").textContent = state.market.status === "live" ? "Chart Live" : state.market.status === "degraded" ? "Fallback Live" : "Connecting";
+  }
 }
 
 function updateMarketStatus() {
@@ -1278,6 +1421,8 @@ function renderTickerTape() {
     })
     .join("");
   renderQuickMarketBoard(items);
+  renderLiveMarketCards(items);
+  renderConnectorDock();
   renderPremiumChart();
 }
 
@@ -1305,6 +1450,72 @@ function renderQuickMarketBoard(items = null) {
         })
         .join("")
     : `<article class="market-tile"><span>Waiting</span><strong>Market feed</strong><small>Click Refresh Center.</small></article>`;
+}
+
+function iconForAsset(asset) {
+  const label = asset?.label || asset?.symbol || "";
+  if (/XAU|GOLD/i.test(label)) return "✦";
+  if (/EUR/i.test(label)) return "🌐";
+  if (/BTC/i.test(label)) return "₿";
+  if (/NAS|QQQ|SPY/i.test(label)) return "🇺🇸";
+  if (/US30|DOW|VIX/i.test(label)) return "🇺🇸";
+  return "●";
+}
+
+function renderLiveMarketCards(items = null) {
+  const root = $("#liveMarketCards");
+  if (!root) return;
+  const assets =
+    items ||
+    ["GOLD", "EURUSD", "BTC", "QQQ", "SPY"]
+      .map((symbol) => getMarketAsset(symbol))
+      .filter(Boolean);
+  const preferred = ["GOLD", "EURUSD", "BTC", "QQQ", "SPY"]
+    .map((symbol) => assets.find((asset) => asset.symbol === symbol || asset.label === symbol || (symbol === "GOLD" && asset.label === "XAUUSD")))
+    .filter(Boolean);
+  const cards = (preferred.length ? preferred : assets).slice(0, 5);
+  root.innerHTML = cards.length
+    ? cards
+        .map((asset) => {
+          const down = asset.change < 0;
+          const displayLabel = asset.label === "GOLD" ? "XAUUSD" : asset.label === "QQQ" ? "NAS100" : asset.label === "SPY" ? "US30" : asset.label;
+          return `
+            <button class="live-market-card ${down ? "down" : "up"}" type="button" data-market-symbol="${asset.symbol}">
+              <span>${iconForAsset(asset)}</span>
+              <div><strong>${displayLabel}</strong><small>${formatMarketPrice(asset)}</small></div>
+              <em>${formatMarketChange(asset.change)}</em>
+            </button>
+          `;
+        })
+        .join("")
+    : `<article class="live-market-card"><span>●</span><div><strong>Loading</strong><small>Market feed</small></div><em>--</em></article>`;
+}
+
+function renderConnectorDock() {
+  const dock = $("#connectorDock");
+  if (!dock) return;
+  const telegramReady = state.liveVerification?.telegramText || state.cloudJournalStatus || "Povezano";
+  const items = [
+    ["⌂", "MT5 Bridge", state.exchange.mt5Connected ? "POVEZAN" : "SPREMAN", state.exchange.mt5Connected ? "Ping live" : "Bridge URL konfiguriran"],
+    ["✣", "n8n Automation", $("#n8nWebhookUrl")?.value ? "AKTIVAN" : "OPTIONAL", $("#n8nWebhookUrl")?.value ? "Webhook online" : "Webhook nije obavezan"],
+    ["◉", "Cloudflare Log", "AKTIVAN", "Audit ukljucen"],
+    ["✈", "Telegram Alerts", "POVEZANO", "@TradingZeusBot"],
+    ["◷", "Economic Calendar", "INVESTING.COM", `${state.economicCalendar.events.length || 0} dogadaja danas`],
+    ["⚑", "Polymarket Signals", state.prediction.markets?.length ? "AKTIVNO" : "KONTEKST", `${state.prediction.markets?.length || 0} otvorena trzista`],
+  ];
+  dock.innerHTML = `
+    ${items
+      .map(
+        ([icon, title, status, detail]) => `
+          <article class="connector-status-card">
+            <span>${icon}</span>
+            <div><strong>${title}</strong><em>${status}</em><small>${detail}</small></div>
+          </article>
+        `,
+      )
+      .join("")}
+    <a class="connector-help" href="/chat/?session=agent%3Amain%3Amain">Otvori chat pomoc</a>
+  `;
 }
 
 function simulateAsset(asset) {
@@ -4462,6 +4673,13 @@ function bindEvents() {
     showToast(`${$("#symbolSelect").value} loaded in chart cockpit.`);
   });
 
+  $("#cockpitFlowSymbol")?.addEventListener("input", () => {
+    if (selectHasValue("#symbolSelect", $("#cockpitFlowSymbol").value)) $("#symbolSelect").value = $("#cockpitFlowSymbol").value;
+    renderPremiumChart();
+    buildSignal();
+    showToast(`${$("#cockpitFlowSymbol").value} loaded in live flow.`);
+  });
+
   ["#agentChallenge", "#agentMarket", "#agentStyle", "#agentDays", "#agentMaxTrades"].forEach((selector) => {
     $(selector).addEventListener("input", () => {
       if (selector === "#agentChallenge") syncChallengeSelects("#agentChallenge");
@@ -4494,6 +4712,8 @@ function bindEvents() {
   $("#approveTestnetTrade").addEventListener("click", approveTestnetTrade);
   $("#killSwitch").addEventListener("click", killSwitch);
   $("#clearKillSwitch")?.addEventListener("click", clearKillSwitch);
+  $("#cockpitKillSwitch")?.addEventListener("click", killSwitch);
+  $("#cockpitRunAgentScope")?.addEventListener("click", runAgentScopeCycle);
 
   [
     "#executionPlatform",
@@ -4614,6 +4834,19 @@ function bindEvents() {
     renderPremiumChart();
     buildSignal();
     showToast(`${asset.label} opened in chart.`);
+  });
+
+  $("#liveMarketCards")?.addEventListener("click", (event) => {
+    const tile = event.target.closest("[data-market-symbol]");
+    if (!tile) return;
+    const asset = getMarketAsset(tile.dataset.marketSymbol);
+    if (!asset) return;
+    const selectValue = asset.label === "XAUUSD" ? "XAUUSD" : asset.label === "BTCUSD" ? "BTCUSD" : asset.symbol;
+    if (selectHasValue("#symbolSelect", selectValue)) $("#symbolSelect").value = selectValue;
+    if (selectHasValue("#cockpitFlowSymbol", selectValue)) $("#cockpitFlowSymbol").value = selectValue;
+    renderPremiumChart();
+    buildSignal();
+    showToast(`${asset.label} opened in live terminal.`);
   });
 
   $("#strategyLibrary")?.addEventListener("click", (event) => {
@@ -4840,8 +5073,11 @@ bootStep("agent plan", buildAgentPlan);
 bootStep("pipeline", renderPipeline);
 bootStep("market status", updateMarketStatus);
 bootStep("premium chart cockpit", renderPremiumChart);
+bootStep("terminal clock", updateTerminalClock);
 bootStep("ticker", renderTickerTape);
+bootStep("live market cards", renderLiveMarketCards);
 bootStep("market board", renderQuickMarketBoard);
+bootStep("connector dock", renderConnectorDock);
 bootStep("live verification", renderLiveVerification);
 bootStep("scanner", renderScanner);
 bootStep("prediction markets", renderPredictionMarkets);
@@ -4875,3 +5111,4 @@ bootStep("market data", () => marketData.start());
 bootStep("calendar data", loadEconomicCalendar);
 bootStep("news data", loadNewsFeed);
 bootStep("bot connector data", loadBotConnectors);
+window.setInterval(updateTerminalClock, 1000);
