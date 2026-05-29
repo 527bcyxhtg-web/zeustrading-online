@@ -92,15 +92,12 @@
     },
     {
       "parameters": {
-        "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7&interval=hourly",
-        "options": {
-          "timeout": 10000
-        }
+        "jsCode": "const strategies = [\n  {\n    symbol: 'BTCUSD',\n    coinGeckoId: 'bitcoin',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'EMA50_TREND',\n    setup: 'BTCUSD hourly close above EMA50',\n    emaPeriod: 50,\n    riskPercent: 0.25,\n    spreadPercent: 0.03,\n    newsRisk: 'low'\n  },\n  {\n    symbol: 'ETHUSD',\n    coinGeckoId: 'ethereum',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'EMA50_TREND',\n    setup: 'ETHUSD hourly close above EMA50',\n    emaPeriod: 50,\n    riskPercent: 0.25,\n    spreadPercent: 0.04,\n    newsRisk: 'low'\n  },\n  {\n    symbol: 'BTCUSD',\n    coinGeckoId: 'bitcoin',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'EMA20_PULLBACK',\n    setup: 'BTCUSD momentum pullback above EMA20',\n    emaPeriod: 20,\n    riskPercent: 0.2,\n    spreadPercent: 0.03,\n    newsRisk: 'low'\n  }\n];\n\nreturn strategies.map((strategy) => ({ json: { ...strategy, scanner_loaded_at: new Date().toISOString() } }));"
       },
-      "id": "fetch-history",
-      "name": "Fetch BTC hourly history",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
+      "id": "load-scanner-strategies",
+      "name": "Load scanner strategies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         1140,
         220
@@ -108,14 +105,30 @@
     },
     {
       "parameters": {
-        "jsCode": "const prices = $input.first().json.prices || [];\nconst period = 50;\nif (prices.length < period + 1) {\n  return [{ json: { ok: false, reason: 'Not enough hourly candles', signal: false } }];\n}\n\nconst closes = prices.map((row) => Number(row[1])).filter((value) => Number.isFinite(value));\nlet ema = closes.slice(0, period).reduce((sum, value) => sum + value, 0) / period;\nconst multiplier = 2 / (period + 1);\nfor (let index = period; index < closes.length; index += 1) {\n  ema = (closes[index] - ema) * multiplier + ema;\n}\n\nconst currentPrice = closes.at(-1);\nconst previousPrice = closes.at(-2);\nconst atrProxy = Math.max(currentPrice * 0.01, Math.abs(currentPrice - previousPrice) * 2);\nconst signal = currentPrice > ema;\nconst stopLoss = Number((currentPrice - atrProxy).toFixed(2));\nconst takeProfit = Number((currentPrice + atrProxy * 2).toFixed(2));\nconst rr = Number(((takeProfit - currentPrice) / Math.max(currentPrice - stopLoss, 1)).toFixed(2));\n\nreturn [{\n  json: {\n    ok: true,\n    symbol: 'BTCUSD',\n    direction: 'LONG',\n    setup: 'BTCUSD hourly close above EMA50',\n    current_price: Number(currentPrice.toFixed(2)),\n    ema50: Number(ema.toFixed(2)),\n    signal,\n    entry: Number(currentPrice.toFixed(2)),\n    stopLoss,\n    takeProfit,\n    rewardRisk: rr,\n    riskPercent: 0.25,\n    spreadPercent: 0.03,\n    newsRisk: 'low',\n    timestamp: new Date().toISOString(),\n    note: signal ? 'Candidate only. Zeus risk gate and manual approval are still required.' : 'No candidate: BTCUSD is not above EMA50.'\n  }\n}];"
+        "url": "={{ 'https://api.coingecko.com/api/v3/coins/' + $json.coinGeckoId + '/market_chart?vs_currency=usd&days=' + $json.days + '&interval=hourly' }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-history",
+      "name": "Fetch crypto hourly history",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const history = $input.first().json || {};\nconst strategy = $('Load scanner strategies').item.json;\nconst prices = history.prices || [];\nconst period = Number(strategy.emaPeriod || 50);\nif (prices.length < period + 1) {\n  return [{ json: { ...strategy, ok: false, reason: 'Not enough hourly candles', signal: false } }];\n}\n\nconst closes = prices.map((row) => Number(row[1])).filter((value) => Number.isFinite(value));\nlet ema = closes.slice(0, period).reduce((sum, value) => sum + value, 0) / period;\nconst multiplier = 2 / (period + 1);\nfor (let index = period; index < closes.length; index += 1) {\n  ema = (closes[index] - ema) * multiplier + ema;\n}\n\nconst currentPrice = closes.at(-1);\nconst previousPrice = closes.at(-2);\nconst atrProxy = Math.max(currentPrice * 0.01, Math.abs(currentPrice - previousPrice) * 2);\nconst signal = strategy.direction === 'LONG' ? currentPrice > ema : currentPrice < ema;\nconst stopLoss = strategy.direction === 'LONG'\n  ? Number((currentPrice - atrProxy).toFixed(2))\n  : Number((currentPrice + atrProxy).toFixed(2));\nconst takeProfit = strategy.direction === 'LONG'\n  ? Number((currentPrice + atrProxy * 2).toFixed(2))\n  : Number((currentPrice - atrProxy * 2).toFixed(2));\nconst rr = Number((Math.abs(takeProfit - currentPrice) / Math.max(Math.abs(currentPrice - stopLoss), 1)).toFixed(2));\n\nreturn [{\n  json: {\n    ...strategy,\n    ok: true,\n    current_price: Number(currentPrice.toFixed(2)),\n    ema: Number(ema.toFixed(2)),\n    signal,\n    entry: Number(currentPrice.toFixed(2)),\n    stopLoss,\n    takeProfit,\n    rewardRisk: rr,\n    timestamp: new Date().toISOString(),\n    note: signal ? 'Candidate only. Zeus risk gate and manual approval are still required.' : `No candidate: ${strategy.symbol} did not pass ${strategy.strategy}.`\n  }\n}];"
       },
       "id": "calculate-ema50",
-      "name": "Calculate EMA50 candidate",
+      "name": "Calculate strategy candidate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1380,
+        1620,
         220
       ]
     },
@@ -135,7 +148,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        1620,
+        1860,
         220
       ]
     },
@@ -145,7 +158,7 @@
         "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/agentscope/orchestrate",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={\n  \"symbol\": $json.symbol,\n  \"direction\": $json.direction,\n  \"setup\": $json.setup,\n  \"entry\": $json.entry,\n  \"stopLoss\": $json.stopLoss,\n  \"takeProfit\": $json.takeProfit,\n  \"riskPercent\": $json.riskPercent,\n  \"spreadPercent\": $json.spreadPercent,\n  \"newsRisk\": $json.newsRisk,\n  \"runtime\": \"n8n\",\n  \"authority\": \"manual-approval\",\n  \"source\": \"n8n-btcusd-ema50\"\n}",
+        "jsonBody": "={\n  \"symbol\": $json.symbol,\n  \"direction\": $json.direction,\n  \"setup\": $json.setup,\n  \"entry\": $json.entry,\n  \"stopLoss\": $json.stopLoss,\n  \"takeProfit\": $json.takeProfit,\n  \"riskPercent\": $json.riskPercent,\n  \"spreadPercent\": $json.spreadPercent,\n  \"newsRisk\": $json.newsRisk,\n  \"runtime\": \"n8n\",\n  \"authority\": \"manual-approval\",\n  \"source\": \"n8n-generalized-scanner\",\n  \"scannerStrategy\": $json.strategy,\n  \"timeframe\": $json.timeframe\n}",
         "options": {
           "timeout": 15000
         }
@@ -155,7 +168,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1860,
+        2100,
         220
       ]
     },
@@ -165,7 +178,7 @@
         "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/telegram/alert",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={\n  \"message\": \"BTCUSD EMA50 candidate\\nDecision: \" + $json.cycle.final_decision + \"\\nPreview ready: \" + $json.cycle.preview.preview_ready + \"\\nApproval required: \" + $json.cycle.preview.approval_required + \"\\nSource: n8n protected scanner\\n\\nNo blind live execution. Open Zeus dashboard for manual approval.\"\n}",
+        "jsonBody": "={\n  \"message\": \"Zeus scanner candidate\\nSymbol: \" + $json.cycle.preview.mt5_payload.symbol + \"\\nDecision: \" + $json.cycle.final_decision + \"\\nPreview ready: \" + $json.cycle.preview.preview_ready + \"\\nApproval required: \" + $json.cycle.preview.approval_required + \"\\nSource: n8n generalized scanner\\n\\nNo blind live execution. Open Zeus dashboard for manual approval.\"\n}",
         "options": {
           "timeout": 15000
         }
@@ -175,7 +188,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2100,
+        2340,
         220
       ]
     },
@@ -195,7 +208,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2340,
+        2580,
         220
       ]
     }
@@ -238,7 +251,7 @@
       "main": [
         [
           {
-            "node": "Fetch BTC hourly history",
+            "node": "Load scanner strategies",
             "type": "main",
             "index": 0
           }
@@ -252,18 +265,29 @@
         ]
       ]
     },
-    "Fetch BTC hourly history": {
+    "Load scanner strategies": {
       "main": [
         [
           {
-            "node": "Calculate EMA50 candidate",
+            "node": "Fetch crypto hourly history",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Calculate EMA50 candidate": {
+    "Fetch crypto hourly history": {
+      "main": [
+        [
+          {
+            "node": "Calculate strategy candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate strategy candidate": {
       "main": [
         [
           {

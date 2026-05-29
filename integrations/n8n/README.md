@@ -16,21 +16,22 @@ What it does:
 2. Calls the MT5 bridge `/health` endpoint.
 3. Stops before market scanning and sends a Zeus Telegram alert if the bridge is
    not demo-live ready.
-4. Fetches BTC hourly candles from CoinGecko only after the bridge passes.
-5. Calculates EMA 50.
-6. If BTCUSD is above EMA 50, sends the candidate to:
+4. Loads scanner strategies from the workflow config.
+5. Fetches hourly crypto candles from CoinGecko only after the bridge passes.
+6. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA trend variants.
+7. If a strategy creates a candidate, sends it to:
 
 ```text
 https://zeustrading.online/api/agentscope/orchestrate
 ```
 
-7. Sends Telegram through the Zeus backend:
+8. Sends Telegram through the Zeus backend:
 
 ```text
 https://zeustrading.online/api/telegram/alert
 ```
 
-8. Optionally sends the result to the local/VPS MT5 bridge preview route:
+9. Optionally sends the result to the local/VPS MT5 bridge preview route:
 
 ```text
 http://127.0.0.1:8789/order/preview
@@ -48,10 +49,14 @@ The workflow expects the bridge health response used by Zeus MT5 bridge:
 `ok`, `live_enabled`, `account.connected`, `account.trade_mode_label`,
 `guard.ok`, and `guard.live_account_blockers`.
 
+Strategy config lives in the `Load scanner strategies` node. Add symbols there
+instead of copying the whole workflow.
+
 ## Safety Contract
 
 - The workflow creates candidates only.
 - The workflow stops before CoinGecko scanning when the MT5 bridge is not ready.
+- Multiple symbols/strategies are scanned from one config node.
 - Telegram alerts are not trade instructions.
 - MT5 receives preview requests only.
 - Live submit still requires Zeus risk gate, manual approval token, SL/TP, kill switch availability, and audit logging.
