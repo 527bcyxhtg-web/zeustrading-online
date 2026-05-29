@@ -22,6 +22,76 @@
     },
     {
       "parameters": {
+        "url": "={{ $env.MT5_BRIDGE_URL || 'http://127.0.0.1:8789' }}/health",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "mt5-health-check",
+      "name": "MT5 bridge health precheck",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        460,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const health = $input.first().json || {};\nconst account = health.account || {};\nconst guard = health.guard || {};\nconst config = health.mt5_connection_config || {};\nconst guardBlockers = Array.isArray(guard.blockers) ? guard.blockers : [];\nconst accountBlockers = Array.isArray(guard.live_account_blockers) ? guard.live_account_blockers : [];\nconst tradeMode = account.trade_mode_label || 'unknown';\nconst demoModeOk = ['demo', 'contest'].includes(tradeMode);\nconst ready = Boolean(\n  health.ok === true &&\n  health.live_enabled === true &&\n  account.connected === true &&\n  demoModeOk &&\n  guard.ok === true &&\n  guardBlockers.length === 0 &&\n  accountBlockers.length === 0\n);\n\nreturn [{\n  json: {\n    ok: ready,\n    bridge_ready: ready,\n    status: ready ? 'demo_live_ready' : 'blocked',\n    live_enabled: health.live_enabled === true,\n    mt5_connected: account.connected === true,\n    trade_mode: tradeMode,\n    demo_mode_ok: demoModeOk,\n    guard_ok: guard.ok === true,\n    real_allowed: config.allow_real_account === true,\n    require_demo_account: config.require_demo_account !== false,\n    blockers: [...guardBlockers, ...accountBlockers, ...(health.ok === true ? [] : ['MT5 bridge health endpoint did not return ok=true.'])],\n    checked_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "normalize-bridge-health",
+      "name": "Normalize bridge readiness",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.bridge_ready }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "bridge-ready",
+      "name": "Bridge demo-live ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/telegram/alert",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"message\": \"MT5 bridge is not demo-live ready\\nStatus: \" + $json.status + \"\\nLive enabled: \" + $json.live_enabled + \"\\nMT5 connected: \" + $json.mt5_connected + \"\\nTrade mode: \" + $json.trade_mode + \"\\nGuard ok: \" + $json.guard_ok + \"\\nBlockers: \" + (($json.blockers || []).join('; ') || 'unknown') + \"\\n\\nWorkflow stopped before market scan.\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "bridge-not-ready-alert",
+      "name": "Send bridge blocked Telegram alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1140,
+        420
+      ]
+    },
+    {
+      "parameters": {
         "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7&interval=hourly",
         "options": {
           "timeout": 10000
@@ -32,8 +102,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        460,
-        300
+        1140,
+        220
       ]
     },
     {
@@ -45,8 +115,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        300
+        1380,
+        220
       ]
     },
     {
@@ -65,8 +135,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        930,
-        300
+        1620,
+        220
       ]
     },
     {
@@ -85,7 +155,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1160,
+        1860,
         220
       ]
     },
@@ -105,7 +175,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1400,
+        2100,
         220
       ]
     },
@@ -125,7 +195,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1640,
+        2340,
         220
       ]
     }
@@ -135,7 +205,47 @@
       "main": [
         [
           {
+            "node": "MT5 bridge health precheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MT5 bridge health precheck": {
+      "main": [
+        [
+          {
+            "node": "Normalize bridge readiness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize bridge readiness": {
+      "main": [
+        [
+          {
+            "node": "Bridge demo-live ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bridge demo-live ready?": {
+      "main": [
+        [
+          {
             "node": "Fetch BTC hourly history",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send bridge blocked Telegram alert",
             "type": "main",
             "index": 0
           }
