@@ -939,6 +939,99 @@ a {
   line-height: 1.4;
 }
 
+.beginner-command-deck {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
+  gap: 12px;
+  margin: 0 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(37, 199, 255, 0.1), transparent 38%),
+    linear-gradient(180deg, rgba(16, 21, 23, 0.96), rgba(7, 10, 12, 0.96));
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.32);
+}
+
+.beginner-command-copy span,
+.agentscope-hero span,
+.agentscope-status-grid span,
+.agentscope-tools > span {
+  color: var(--cyan);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.beginner-command-copy h2,
+.agentscope-hero h2 {
+  margin: 6px 0 8px;
+  color: var(--ink);
+  font-size: clamp(1.55rem, 3vw, 2.5rem);
+  line-height: 1;
+}
+
+.beginner-command-copy p,
+.agentscope-hero p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.beginner-action-lanes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.beginner-lane {
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.beginner-lane:hover {
+  transform: translateY(-2px);
+  border-color: rgba(217, 255, 55, 0.32);
+  background: rgba(217, 255, 55, 0.07);
+}
+
+.beginner-lane span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: #07100b;
+  background: linear-gradient(135deg, var(--lime), var(--cyan));
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.beginner-lane strong,
+.beginner-lane small {
+  display: block;
+}
+
+.beginner-lane strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.beginner-lane small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .guided-flow-panel {
   display: grid;
   gap: 14px;
@@ -1081,6 +1174,196 @@ a {
   flex-wrap: wrap;
   gap: 5px;
   margin-top: 9px;
+}
+
+.agentscope-runtime-panel {
+  display: grid;
+  gap: 13px;
+  margin: 0 0 18px;
+  border: 1px solid rgba(37, 199, 255, 0.16);
+  border-radius: 10px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(37, 199, 255, 0.09), transparent 40%),
+    linear-gradient(315deg, rgba(217, 255, 55, 0.06), transparent 44%),
+    #070b0d;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
+}
+
+.agentscope-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+
+.agentscope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.agentscope-control-strip {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.6fr) minmax(260px, 1.5fr) minmax(180px, 0.8fr);
+  gap: 10px;
+}
+
+.agentscope-control-strip label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agentscope-control-strip input,
+.agentscope-control-strip select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.agentscope-status-grid,
+.agentscope-output-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agentscope-status-grid article,
+.agentscope-tools article {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.agentscope-status-grid strong,
+.agentscope-status-grid small,
+.agentscope-tools strong,
+.agentscope-tools small {
+  display: block;
+}
+
+.agentscope-status-grid strong {
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.agentscope-status-grid small,
+.agentscope-tools small {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.agentscope-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agentscope-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.agentscope-step > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: #07100b;
+  background: var(--cyan);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.agentscope-step strong,
+.agentscope-step small,
+.agentscope-step em {
+  display: block;
+}
+
+.agentscope-step strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.agentscope-step small {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.agentscope-step em {
+  margin-top: 8px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.agentscope-step.passed {
+  border-color: rgba(67, 226, 141, 0.3);
+}
+
+.agentscope-step.warning {
+  border-color: rgba(255, 178, 62, 0.32);
+}
+
+.agentscope-step.blocked {
+  border-color: rgba(255, 93, 93, 0.32);
+}
+
+.agentscope-step.blocked > span {
+  color: #fff;
+  background: var(--red);
+}
+
+.agentscope-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  grid-column: span 2;
+}
+
+.agentscope-tools > span {
+  grid-column: 1 / -1;
+}
+
+.agentscope-output {
+  min-height: 236px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  white-space: pre-wrap;
+}
+
+.safe-text {
+  color: var(--green) !important;
+}
+
+.blocked-text {
+  color: var(--red) !important;
 }
 
 .sync-pill {
@@ -5244,8 +5527,12 @@ textarea:hover {
   }
 
   .pipeline-grid,
+  .beginner-command-deck,
   .live-desk-order,
   .guided-flow-grid,
+  .agentscope-status-grid,
+  .agentscope-steps,
+  .agentscope-output-grid,
   .source-action-grid,
   .connector-grid,
   .connector-workbench,
@@ -5265,13 +5552,20 @@ textarea:hover {
   }
 
   .guided-flow-header,
-  .agent-sync-board {
+  .agent-sync-board,
+  .agentscope-hero {
     flex-direction: column;
   }
 
   .agent-sync-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-width: 0;
+  }
+
+  .beginner-action-lanes,
+  .agentscope-control-strip,
+  .agentscope-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .calendar-controls {
@@ -5480,8 +5774,15 @@ textarea:hover {
   }
 
   .nav-list,
+  .beginner-command-deck,
+  .beginner-action-lanes,
   .live-desk-order,
   .guided-flow-grid,
+  .agentscope-control-strip,
+  .agentscope-status-grid,
+  .agentscope-steps,
+  .agentscope-output-grid,
+  .agentscope-tools,
   .source-action-grid,
   .connector-grid,
   .connector-workbench,
@@ -5519,6 +5820,10 @@ textarea:hover {
 
   .agent-sync-matrix {
     grid-template-columns: 1fr;
+  }
+
+  .agentscope-tools {
+    grid-column: auto;
   }
 
   .calendar-event-card {

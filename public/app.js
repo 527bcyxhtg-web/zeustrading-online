@@ -492,6 +492,17 @@ const agentSyncRows = [
   ["Journal", "Every setup, blocker, approval, response and result is stored", "test", "live"],
 ];
 
+const agentScopeRoles = [
+  ["market-scanner", "Market Scanner", "Scans symbols and creates candidates only."],
+  ["news-risk", "News/Macro Risk", "Blocks high-impact news and platform instability."],
+  ["strategy-validator", "Strategy Validator", "Checks playbook confirmations and rejects weak setups."],
+  ["prop-rules", "Prop Firm Rules", "Applies FundedElite/FTMO daily and total drawdown rules."],
+  ["risk-gate", "Position Sizing", "Calculates size and blocks missing SL/TP, low R:R or too much risk."],
+  ["supervisor", "Supervisor", "Combines all outputs into BLOCK, WATCH, PREVIEW or READY."],
+  ["execution-preview", "Execution Preview", "Builds MT5/CLOB/testnet preview and waits for user approval."],
+  ["journal", "Audit Journal", "Stores every decision, blocker, approval and result."],
+];
+
 const botStrategyProfiles = {
   vwap: {
     label: "VWAP reclaim + volume",
@@ -732,6 +743,11 @@ const state = {
     connectors: botConnectorSeeds,
     skills: cmcSkillSeeds,
     preview: null,
+  },
+  agentScope: {
+    cycle: null,
+    payload: null,
+    status: "ready",
   },
   clob: {
     markets: [],
@@ -1918,6 +1934,159 @@ function renderGuidedFlow(activeId = "profile") {
   if ($("#guidedFlowStatus")) {
     const step = guidedFlowSteps.find((item) => item.id === activeId) || guidedFlowSteps[0];
     $("#guidedFlowStatus").textContent = `${guidedFlowSteps.indexOf(step) + 1} / ${step.title}`;
+  }
+}
+
+function renderAgentScopePanel(data = null) {
+  const cycle = data?.cycle || state.agentScope.cycle;
+  const steps = data?.runtime?.roles || cycle?.agents || agentScopeRoles.map(([id, title, text]) => ({
+    id,
+    name: title,
+    status: "waiting",
+    output: text,
+    live_authority: id === "execution-preview" ? "manual approval required" : "analysis only",
+  }));
+  const status = $("#agentScopeStatus");
+  const decision = $("#agentScopeDecision");
+  const stepRoot = $("#agentScopeSteps");
+  const toolsRoot = $("#agentScopeTools");
+  const output = $("#agentScopeOutput");
+
+  if (status) {
+    const label = cycle?.final_decision || (state.agentScope.status === "running" ? "Running" : "Ready");
+    status.textContent = label;
+    status.className = cycle?.final_decision === "BLOCK" ? "blocked-text" : cycle?.final_decision === "READY_FOR_MANUAL_APPROVAL" ? "safe-text" : "";
+  }
+  if (decision) {
+    decision.textContent = cycle
+      ? `${cycle.final_decision}: ${cycle.agents?.find((agent) => agent.agent === "Supervisor Agent")?.summary || "AgentScope handoff completed."}`
+      : "Run the chain to see the exact blocker or next safe action.";
+  }
+  if (stepRoot) {
+    stepRoot.innerHTML = steps
+      .map((role, index) => {
+        const name = role.name || role.agent || "Agent";
+        const text = role.output || role.reason || role.explanation || role.summary || role.rejection_reason || "Waiting for input.";
+        const statusClass = role.status || "waiting";
+        return `
+          <article class="agentscope-step ${statusClass}">
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>${name}</strong>
+              <small>${text}</small>
+              <em>${role.live_authority || role.handoff_to || "visible handoff"}</em>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+  if (toolsRoot) {
+    const tools = data?.runtime?.tools || [
+      "Market data",
+      "Economic calendar",
+      "OpenRouter review",
+      "MT5 bridge preview",
+      "Telegram alert",
+      "D1 audit log",
+      "n8n webhook optional",
+    ];
+    toolsRoot.innerHTML = `
+      <span>Tools + boundaries</span>
+      ${tools.map((tool) => `<article><strong>${tool}</strong><small>Backend or controlled UI route. Never stores broker passwords, seed phrases or withdrawal keys.</small></article>`).join("")}
+    `;
+  }
+  if (output) {
+    output.textContent = cycle
+      ? JSON.stringify(
+          {
+            run_id: cycle.run_id,
+            final_decision: cycle.final_decision,
+            preview_ready: cycle.preview?.preview_ready,
+            approval_required: cycle.preview?.approval_required,
+            n8n: data?.runtime?.n8n || "optional",
+            blockers: cycle.agents?.find((agent) => agent.agent === "Supervisor Agent")?.exact_blockers || [],
+          },
+          null,
+          2,
+        )
+      : "AgentScope chain is ready. It will show every agent output and the final safe next action.";
+  }
+}
+
+function collectAgentScopePayload() {
+  const payload = collectExecutionPayload(false);
+  payload.runtime = $("#agentScopeRuntimeMode")?.value || "zeus-native";
+  payload.authority = $("#agentScopeAuthority")?.value || "manual-approval";
+  payload.n8nWebhookUrl = $("#n8nWebhookUrl")?.value || "";
+  payload.pushToN8n = payload.runtime === "n8n";
+  payload.relativeVolume = numberValue("#signalVolume") || 1.7;
+  payload.rsi = numberValue("#signalRsi") || 58;
+  payload.minRewardRisk = 1.5;
+  payload.agentScope = true;
+  return payload;
+}
+
+async function runAgentScopeCycle() {
+  if (state.agentScope.status === "running") return;
+  state.agentScope.status = "running";
+  state.agentScope.payload = collectAgentScopePayload();
+  renderAgentScopePanel();
+  agentConsoleLog("AgentScope", "Visible multi-agent chain started.");
+  try {
+    const response = await fetch("/api/agentscope/orchestrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.agentScope.payload),
+    });
+    const data = await response.json();
+    if (!response.ok && !data.cycle) throw new Error(data.error || data.reason || "AgentScope route unavailable.");
+    state.agentScope.cycle = data.cycle;
+    state.agentScope.status = data.cycle?.final_decision || "done";
+    renderAgentScopePanel(data);
+    renderAgentCycle({ cycle: data.cycle });
+    if (data.cycle?.preview?.preview_ready) {
+      state.exchange.preview = {
+        ...(state.exchange.preview || {}),
+        exchange: "mt5-bridge",
+        mode: $("#executionModeSelect")?.value || "protected-live",
+        symbol: data.cycle.preview.mt5_payload.symbol,
+        side: data.cycle.preview.mt5_payload.direction === "SHORT" ? "SELL" : "BUY",
+        entry: data.cycle.preview.mt5_payload.entry,
+        stopLoss: data.cycle.preview.mt5_payload.stop_loss,
+        takeProfit: data.cycle.preview.mt5_payload.take_profit,
+        quantity: data.cycle.preview.mt5_payload.lot_size,
+        riskAmount: data.cycle.preview.mt5_payload.estimated_loss,
+        rewardRisk: data.cycle.preview.mt5_payload.rr_ratio,
+        approved: data.cycle.final_decision === "READY_FOR_MANUAL_APPROVAL",
+        blockers: data.cycle.agents.find((agent) => agent.agent === "Supervisor Agent")?.exact_blockers || [],
+      };
+      applyAgentPreviewToExecutionForm();
+    }
+    addExchangeLog("AgentScope chain", data.cycle?.final_decision || "Completed", response.ok ? "approved" : "blocked");
+    showToast("AgentScope chain completed. Check final decision and blockers.");
+  } catch (error) {
+    state.agentScope.status = "error";
+    renderAgentScopePanel({ error: error.message });
+    agentConsoleLog("AgentScope error", error.message);
+    showToast("AgentScope route unavailable. Local UI stayed safe.");
+  }
+}
+
+async function copyN8nPayload() {
+  const payload = state.agentScope.payload || collectAgentScopePayload();
+  const n8nPayload = {
+    source: "zeustrading.online",
+    purpose: "agent-orchestration-audit",
+    safety: "manual approval required for live execution",
+    payload,
+  };
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(n8nPayload, null, 2));
+    showToast("n8n payload copied.");
+  } catch {
+    $("#agentScopeOutput").textContent = JSON.stringify(n8nPayload, null, 2);
+    showToast("Clipboard unavailable. Payload printed in AgentScope output.");
   }
 }
 
@@ -4400,6 +4569,20 @@ function bindEvents() {
     showToast("Risk gate refreshed.");
   });
 
+  $("#beginnerRefreshData")?.addEventListener("click", () => {
+    marketData.refresh();
+    loadEconomicCalendar();
+    loadNewsFeed();
+    refreshLiveVerification();
+    showToast("Live data, vijesti i calendar se osvjezavaju.");
+  });
+
+  $("#beginnerRunAgents")?.addEventListener("click", () => {
+    const target = document.querySelector('[data-panel="agentscope-runtime"]');
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    runAgentScopeCycle();
+  });
+
   $("#adminSaveShortcut")?.addEventListener("click", () => {
     const target = document.querySelector('[data-panel="profile"]');
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4490,6 +4673,14 @@ function bindEvents() {
   $("#loadBotConnectors")?.addEventListener("click", loadBotConnectors);
   $("#buildConnectorPreview")?.addEventListener("click", buildConnectorPreview);
   $("#openSelectedConnector")?.addEventListener("click", openSelectedConnector);
+  $("#runAgentScopeCycle")?.addEventListener("click", runAgentScopeCycle);
+  $("#copyN8nPayload")?.addEventListener("click", copyN8nPayload);
+  ["#agentScopeRuntimeMode", "#agentScopeAuthority", "#n8nWebhookUrl"].forEach((selector) => {
+    $(selector)?.addEventListener("input", () => {
+      state.agentScope.payload = collectAgentScopePayload();
+      renderAgentScopePanel();
+    });
+  });
   ["#connectorSelect", "#connectorUseCase", "#connectorSymbol", "#connectorRisk", "#connectorNoWithdraw", "#connectorManualApproval"].forEach((selector) => {
     $(selector)?.addEventListener("input", () => {
       $("#botConnectorStatus").className = "status-chip warning";
@@ -4662,6 +4853,7 @@ bootStep("start here flow", renderStartHereFlow);
 bootStep("system check timeline", renderSystemCheckTimeline);
 bootStep("system check report", renderSystemCheckReport);
 bootStep("guided flow", renderGuidedFlow);
+bootStep("agentscope runtime", renderAgentScopePanel);
 bootStep("bot connectors", renderBotConnectors);
 bootStep("clob terminal", renderClobMarkets);
 bootStep("clob wallet gates", updateClobWalletUi);

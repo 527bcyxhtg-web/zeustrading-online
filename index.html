@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zeus Trading Live Desk</title>
-    <link rel="stylesheet" href="styles.css?v=20260525-live-desk-1" />
+    <link rel="stylesheet" href="styles.css?v=20260529-agentscope-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -223,6 +223,36 @@
           </article>
         </section>
 
+        <section class="beginner-command-deck" data-panel="beginner-command" aria-label="Beginner protected live command deck">
+          <div class="beginner-command-copy">
+            <span>Start here</span>
+            <h2>Jednostavno sucelje za live agente</h2>
+            <p>Zeus radi kao lanac specijaliziranih agenata: svaki agent obavi jedan zadatak, preda rezultat sljedecem agentu, a zadnji agent smije pripremiti samo protected preview. Live nalog ide tek nakon risk gatea i tvog klika.</p>
+          </div>
+          <div class="beginner-action-lanes">
+            <button class="beginner-lane quick-jump" type="button" data-quick-target="profile">
+              <span>01</span>
+              <strong>Profil</strong>
+              <small>Registracija, postavke i bridge URL.</small>
+            </button>
+            <button class="beginner-lane" id="beginnerRefreshData" type="button">
+              <span>02</span>
+              <strong>Live data</strong>
+              <small>Cijene, chart, news i calendar.</small>
+            </button>
+            <button class="beginner-lane" id="beginnerRunAgents" type="button">
+              <span>03</span>
+              <strong>AgentScope chain</strong>
+              <small>Scanner → risk → supervisor.</small>
+            </button>
+            <button class="beginner-lane quick-jump" type="button" data-quick-target="bot-builder">
+              <span>04</span>
+              <strong>Preview</strong>
+              <small>MT5/CLOB/testnet plan prije approvala.</small>
+            </button>
+          </div>
+        </section>
+
         <section class="guided-flow-panel" data-panel="guided-flow" aria-label="Guided trading system flow">
           <div class="guided-flow-header">
             <div>
@@ -238,6 +268,64 @@
               <p>Svi agenti rade sinkronizirano. Testnet/mock može biti automatski; live submit ostaje zaključan iza risk gatea i user approvala.</p>
             </div>
             <div id="agentSyncMatrix" class="agent-sync-matrix"></div>
+          </div>
+        </section>
+
+        <section class="agentscope-runtime-panel" data-panel="agentscope-runtime" aria-label="AgentScope multi-agent runtime">
+          <div class="agentscope-hero">
+            <div>
+              <span>AgentScope-inspired live orchestration</span>
+              <h2>Multi-agent system koji korisnik razumije</h2>
+              <p>Svaki agent ima jedan posao, vidljiv output, status, blocker i sljedecu akciju. n8n se moze koristiti kao webhook orkestrator, ali Zeus risk gate ostaje zadnja sigurnosna brava.</p>
+            </div>
+            <div class="agentscope-actions">
+              <button id="runAgentScopeCycle" class="primary-action" type="button">Run AgentScope Chain</button>
+              <button id="copyN8nPayload" class="secondary-action" type="button">Copy n8n Payload</button>
+            </div>
+          </div>
+          <div class="agentscope-control-strip">
+            <label>
+              Runtime
+              <select id="agentScopeRuntimeMode">
+                <option value="zeus-native">Zeus Native Runtime</option>
+                <option value="agentscope">AgentScope Blueprint</option>
+                <option value="n8n">n8n Webhook Bridge</option>
+              </select>
+            </label>
+            <label>
+              n8n webhook URL
+              <input id="n8nWebhookUrl" type="url" placeholder="https://n8n.example.com/webhook/zeus-agent" />
+            </label>
+            <label>
+              Live authority
+              <select id="agentScopeAuthority">
+                <option value="manual-approval">Manual approval required</option>
+                <option value="preview-only">Preview only</option>
+                <option value="testnet-auto">Testnet/mock auto only</option>
+              </select>
+            </label>
+          </div>
+          <div class="agentscope-status-grid">
+            <article>
+              <span>Status</span>
+              <strong id="agentScopeStatus">Ready to run</strong>
+              <small id="agentScopeDecision">No decision yet.</small>
+            </article>
+            <article>
+              <span>Final agent</span>
+              <strong>Execution Preview</strong>
+              <small>Can prepare MT5/order preview only after all blockers are clear.</small>
+            </article>
+            <article>
+              <span>Safety</span>
+              <strong>Protected Live</strong>
+              <small>SL/TP, drawdown, news, kill switch and user approval are mandatory.</small>
+            </article>
+          </div>
+          <div id="agentScopeSteps" class="agentscope-steps"></div>
+          <div class="agentscope-output-grid">
+            <div id="agentScopeTools" class="agentscope-tools"></div>
+            <pre id="agentScopeOutput" class="agentscope-output">Click Run AgentScope Chain to create a visible agent handoff plan.</pre>
           </div>
         </section>
 

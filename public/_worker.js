@@ -561,6 +561,95 @@ function runProtectedAgentCycle(input = {}, killSwitchActive = false) {
   };
 }
 
+const AGENTSCOPE_RUNTIME_TOOLS = [
+  "market-data-feed",
+  "economic-calendar-risk",
+  "openrouter-supervisor",
+  "prop-firm-rule-engine",
+  "mt5-bridge-preview",
+  "wallet-clob-preview",
+  "telegram-alert",
+  "cloudflare-d1-audit",
+];
+
+function buildAgentScopeRuntime(cycle, input = {}, n8n = null) {
+  const roles = [
+    ["market-scanner", "Market Scanner Agent", "candidate producer", "news-risk"],
+    ["news-risk", "News/Macro Risk Agent", "risk blocker", "strategy-validator"],
+    ["strategy-validator", "Strategy Validation Agent", "playbook validator", "prop-rules"],
+    ["prop-rules", "Prop Firm Rules Agent", "challenge guard", "risk-gate"],
+    ["risk-gate", "Position Sizing / Risk Gate Agent", "position sizing", "supervisor"],
+    ["supervisor", "Supervisor Agent", "final decision", "execution-preview"],
+    ["execution-preview", "Execution Preview Agent / MT5 Bridge Agent", "preview only", "journal"],
+    ["journal", "Audit Journal Agent", "audit memory", "human"],
+  ].map(([id, agentName, purpose, handoffTo]) => {
+    const source = cycle.agents.find((agent) => agent.agent === agentName) || {};
+    return {
+      id,
+      name: agentName,
+      framework_role: "AgentScope ReAct-style role",
+      purpose,
+      status: source.status || (id === "journal" ? "passed" : "waiting"),
+      output: source.reason || source.explanation || source.summary || source.rejection_reason || `${agentName} completed handoff.`,
+      handoff_to: handoffTo,
+      live_authority:
+        id === "execution-preview"
+          ? "May prepare order preview only. Live submit still requires fresh risk re-check and user click."
+          : id === "journal"
+            ? "Writes audit trail only."
+            : "Analysis/gating only. Cannot submit orders.",
+    };
+  });
+  return {
+    framework: "AgentScope-inspired Zeus Runtime",
+    source: "https://agentscope.io/",
+    docs: "https://docs.agentscope.io/",
+    mode: input.runtime || "zeus-native",
+    authority: input.authority || "manual-approval",
+    tools: AGENTSCOPE_RUNTIME_TOOLS,
+    roles,
+    n8n: n8n || {
+      enabled: false,
+      reason: "Set N8N_AGENT_WEBHOOK_URL as a Cloudflare secret to mirror sanitized orchestration events to n8n.",
+    },
+    safety_contract: [
+      "No blind live auto-trading.",
+      "No order without SL and TP.",
+      "No broker passwords, 2FA bypass, seed phrases or withdrawal keys in browser.",
+      "Manual approval is mandatory for Protected Live.",
+      "Kill switch, journal and Cloudflare audit remain hard gates.",
+    ],
+  };
+}
+
+async function maybeSendAgentScopeToN8n(env, cycle, input) {
+  const webhook = String(env.N8N_AGENT_WEBHOOK_URL || "").trim();
+  if (!webhook || !input.pushToN8n) {
+    return { enabled: Boolean(webhook), sent: false, reason: webhook ? "n8n push was not requested." : "N8N_AGENT_WEBHOOK_URL secret is not configured." };
+  }
+  const payload = {
+    source: "zeustrading.online",
+    event: "agentscope_orchestration",
+    created_at: new Date().toISOString(),
+    final_decision: cycle.final_decision,
+    run_id: cycle.run_id,
+    preview_ready: cycle.preview?.preview_ready || false,
+    approval_required: true,
+    candidate: cycle.candidate,
+    blockers: cycle.agents.find((agent) => agent.agent === "Supervisor Agent")?.exact_blockers || [],
+  };
+  try {
+    const response = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "ZeusTrading-AgentScope/1.0" },
+      body: JSON.stringify(payload),
+    });
+    return { enabled: true, sent: response.ok, status: response.status };
+  } catch (error) {
+    return { enabled: true, sent: false, reason: error.message };
+  }
+}
+
 async function ensureAuthSchema(env) {
   if (!env.zeustrading_users) return false;
   await env.zeustrading_users
@@ -936,6 +1025,43 @@ async function agentRunCycle(request, env) {
       .run();
   }
   return jsonResponse({ ok: cycle.ok, kill_switch: kill, cycle }, cycle.final_decision === "BLOCK" ? 422 : 200);
+}
+
+async function agentScopeOrchestrate(request, env) {
+  if (!(await ensureExecutionAuditSchema(env))) return jsonResponse({ ok: false, error: "D1 database is not configured." }, 503);
+  const body = await readJson(request);
+  if (!body) return jsonResponse({ ok: false, error: "Invalid JSON body." }, 400);
+  const user = await currentUser(request, env);
+  const kill = await killSwitchState(request, env);
+  const cycle = runProtectedAgentCycle({ ...body, agentScope: true }, kill.active);
+  const n8n = await maybeSendAgentScopeToN8n(env, cycle, body);
+  const runtime = buildAgentScopeRuntime(cycle, body, n8n);
+  const now = new Date().toISOString();
+  await env.zeustrading_users.batch([
+    env.zeustrading_users
+      .prepare("INSERT INTO agent_run_logs (id, user_id, run_id, final_decision, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), user?.id || null, cycle.run_id, cycle.final_decision, JSON.stringify({ runtime, cycle }), now),
+    env.zeustrading_users
+      .prepare("INSERT INTO journal_entries (id, user_id, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), user?.id || null, "agentscope_orchestration", JSON.stringify({ runtime, cycle }), now),
+    env.zeustrading_users
+      .prepare("INSERT INTO account_state_snapshots (id, user_id, account_state, created_at) VALUES (?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), user?.id || null, JSON.stringify(cycle.account_guard), now),
+  ]);
+  if (cycle.final_decision === "BLOCK") {
+    await env.zeustrading_users
+      .prepare("INSERT INTO rejected_trades (id, user_id, run_id, reason, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(
+        crypto.randomUUID(),
+        user?.id || null,
+        cycle.run_id,
+        cycle.agents.find((agent) => agent.agent === "Supervisor Agent")?.summary || "AgentScope blocked",
+        JSON.stringify({ runtime, cycle }),
+        now,
+      )
+      .run();
+  }
+  return jsonResponse({ ok: cycle.ok, kill_switch: kill, runtime, cycle }, cycle.final_decision === "BLOCK" ? 422 : 200);
 }
 
 async function mt5Preview(request, env) {
@@ -2379,6 +2505,12 @@ export default {
       return agentRunCycle(request, env);
     }
     if (url.pathname === "/api/agent/run-cycle") {
+      return jsonResponse({ error: "Use POST." }, 405);
+    }
+    if (url.pathname === "/api/agentscope/orchestrate" && request.method === "POST") {
+      return agentScopeOrchestrate(request, env);
+    }
+    if (url.pathname === "/api/agentscope/orchestrate") {
       return jsonResponse({ error: "Use POST." }, 405);
     }
     if (url.pathname === "/api/mt5/preview" && request.method === "POST") {
