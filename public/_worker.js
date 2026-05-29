@@ -7,6 +7,7 @@ const POLYMARKET_CLOB_BASE = "https://clob.polymarket.com";
 const BINANCE_TESTNET_BASE = "https://testnet.binance.vision/api";
 const STOOQ_QUOTE_BASE = "https://stooq.com/q/l/";
 const YAHOO_QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
+const TELEGRAM_API_BASE = "https://api.telegram.org";
 const CRYPTO_ASSETS = [
   { id: "bitcoin", symbol: "BTC", label: "BTCUSD" },
   { id: "ethereum", symbol: "ETH", label: "ETHUSD" },
@@ -1966,6 +1967,48 @@ async function botConnectorPreview(request, env) {
   return jsonResponse({ ok: true, preview });
 }
 
+async function telegramAlert(request, env) {
+  if (!(await ensureExecutionAuditSchema(env))) return jsonResponse({ ok: false, error: "D1 database is not configured." }, 503);
+  const body = await readJson(request);
+  if (!body) return jsonResponse({ ok: false, error: "Invalid JSON body." }, 400);
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    await saveJournalEntry(request, env, "telegram_alert_blocked", {
+      reason: "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID Cloudflare secret is missing.",
+      preview: String(body.message || "").slice(0, 600),
+    });
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Telegram is not configured. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID as Cloudflare secrets.",
+      },
+      503,
+    );
+  }
+  const message = String(body.message || "").trim().slice(0, 3900);
+  if (message.length < 20) return jsonResponse({ ok: false, error: "Telegram message is too short." }, 400);
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: message,
+      disable_web_page_preview: true,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  await saveJournalEntry(request, env, response.ok ? "telegram_alert_sent" : "telegram_alert_failed", {
+    ok: response.ok,
+    status: response.status,
+    telegram: data,
+    context: body.context || {},
+    messagePreview: message.slice(0, 1000),
+  });
+  if (!response.ok) return jsonResponse({ ok: false, error: data.description || "Telegram send failed.", telegram: data }, 502);
+  return jsonResponse({ ok: true, telegram: { message_id: data.result?.message_id || null } });
+}
+
 async function predictionMarkets(request, env) {
   const url = new URL(request.url);
   const query = String(url.searchParams.get("q") || "fomc").trim().slice(0, 80);
@@ -2408,6 +2451,12 @@ export default {
       return botConnectorPreview(request, env);
     }
     if (url.pathname === "/api/bot-connectors/preview") {
+      return jsonResponse({ error: "Use POST." }, 405);
+    }
+    if (url.pathname === "/api/telegram/alert" && request.method === "POST") {
+      return telegramAlert(request, env);
+    }
+    if (url.pathname === "/api/telegram/alert") {
       return jsonResponse({ error: "Use POST." }, 405);
     }
     if (url.pathname === "/api/compliance/check" && request.method === "POST") {

@@ -357,6 +357,22 @@
             </article>
           </div>
 
+          <section class="live-verification-panel" aria-label="Live verification and Telegram alerts">
+            <div class="panel-header compact">
+              <div>
+                <h3>Live Price + News Verification</h3>
+                <p>Realno pracenje cijena, tablica, news blocker, analiza i Telegram alert. Alert nije signal za slijepo trgovanje.</p>
+              </div>
+              <div class="verification-actions">
+                <button id="refreshLiveVerification" class="secondary-action" type="button">Refresh + Analyze</button>
+                <button id="sendTelegramAlert" class="primary-action" type="button">Send Telegram Alert</button>
+              </div>
+            </div>
+            <div id="liveVerificationSummary" class="live-verification-summary">Waiting for live verification.</div>
+            <div id="livePriceTable" class="live-price-table"></div>
+            <pre id="liveAnalysisOutput" class="live-analysis-output">Refresh live verification to build a detailed market/risk report.</pre>
+          </section>
+
           <div class="live-intel-grid">
             <section class="intel-panel news-intel-panel">
               <div class="panel-header compact">

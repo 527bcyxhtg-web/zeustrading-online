@@ -722,6 +722,12 @@ const state = {
     source: "fallback",
     updatedAt: null,
   },
+  liveVerification: {
+    decision: "WAIT",
+    report: "",
+    telegramText: "",
+    blockers: [],
+  },
   botConnectors: {
     connectors: botConnectorSeeds,
     skills: cmcSkillSeeds,
@@ -777,6 +783,10 @@ function numberValue(id) {
 function selectHasValue(selector, value) {
   const select = $(selector);
   return Boolean(select && Array.from(select.options).some((option) => option.value === value));
+}
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
 }
 
 function syncChallengeSelects(sourceSelector) {
@@ -1562,6 +1572,125 @@ function renderNewsFeed(data = null) {
       `,
     )
     .join("");
+}
+
+function buildLiveVerificationReport() {
+  const assets = Array.from(state.market.assets.values())
+    .filter((asset) => Number.isFinite(Number(asset.price)) && Number(asset.price) > 0)
+    .sort((a, b) => Math.abs(Number(b.change || 0)) - Math.abs(Number(a.change || 0)));
+  const focusAssets = ["XAUUSD", "EURUSD", "BTCUSD", "ETHUSD", "SOLUSD", "SPY", "QQQ", "NVDA", "AMD", "TSLA"]
+    .map((label) => assets.find((asset) => asset.label === label || asset.symbol === label.replace("USD", "")))
+    .filter(Boolean);
+  const uniqueAssets = Array.from(new Map([...focusAssets, ...assets].map((asset) => [asset.symbol, asset])).values()).slice(0, 12);
+  const newsItems = state.news.items || [];
+  const calendarEvents = state.economicCalendar.events || [];
+  const highNews = newsItems.filter((item) => String(item.risk || "").toLowerCase() === "high");
+  const highCalendar = calendarEvents.filter((event) => String(event.impact || "").toLowerCase() === "high");
+  const staleMs = state.market.lastUpdated ? Date.now() - state.market.lastUpdated.getTime() : Infinity;
+  const stale = staleMs > state.market.refreshMs * 2.5;
+  const strongMovers = uniqueAssets.filter((asset) => Math.abs(Number(asset.change || 0)) >= 2.5);
+  const blockers = [
+    ...(state.market.status !== "live" ? [`Market feed is ${state.market.status}; verify source before preview.`] : []),
+    ...(stale ? ["Market data is stale; refresh before any preview."] : []),
+    ...highNews.slice(0, 2).map((item) => `High news risk: ${item.title}`),
+    ...highCalendar.slice(0, 2).map((event) => `High calendar risk: ${event.currency || "ALL"} ${event.event || "macro event"}`),
+  ];
+  const decision = blockers.length ? "WATCH / BLOCK LIVE" : strongMovers.length ? "WATCH / PREVIEW ONLY" : "DATA VERIFIED";
+  const rows = uniqueAssets.map((asset) => ({
+    symbol: asset.label || asset.symbol,
+    price: formatMarketPrice(asset),
+    change: formatMarketChange(asset.change),
+    source: asset.source || "market feed",
+    volume: Number(asset.volume || 0) ? fmtCompact.format(Number(asset.volume || 0)) : "-",
+  }));
+  const generatedAt = new Date().toLocaleString("hr-HR", { dateStyle: "medium", timeStyle: "medium" });
+  const report = [
+    `ZEUS LIVE VERIFICATION - ${decision}`,
+    `Generated: ${generatedAt}`,
+    `Feed: ${state.market.status} / ${state.market.source}`,
+    `Updated: ${state.market.lastUpdated ? state.market.lastUpdated.toLocaleTimeString("hr-HR") : "not loaded"}`,
+    "",
+    "Top tracked prices:",
+    ...rows.slice(0, 8).map((row) => `- ${row.symbol}: ${row.price} (${row.change}) via ${row.source}`),
+    "",
+    `News: ${newsItems.length} items, high risk ${highNews.length}`,
+    `Calendar: ${calendarEvents.length} events, high impact ${highCalendar.length}`,
+    blockers.length ? `Blockers:\n- ${blockers.join("\n- ")}` : "Blockers: none detected in current dashboard context.",
+    "",
+    "Verification rule: no live order without SL, TP, risk gate, MT5 bridge check, manual approval and audit log.",
+  ].join("\n");
+  return { decision, rows, blockers, report, generatedAt };
+}
+
+function renderLiveVerification() {
+  const summary = $("#liveVerificationSummary");
+  const table = $("#livePriceTable");
+  const output = $("#liveAnalysisOutput");
+  if (!summary || !table || !output) return;
+  const verification = buildLiveVerificationReport();
+  state.liveVerification = {
+    ...verification,
+    telegramText: verification.report,
+  };
+  summary.className = `live-verification-summary ${verification.blockers.length ? "danger" : "safe"}`;
+  summary.textContent = `${verification.decision} · ${verification.rows.length} tracked instruments · ${verification.blockers.length} blockers`;
+  table.innerHTML = `
+    <div class="live-price-row head">
+      <span>Symbol</span><span>Price</span><span>24h/Session</span><span>Volume</span><span>Source</span>
+    </div>
+    ${verification.rows
+      .map(
+        (row) => `
+          <div class="live-price-row">
+            <strong>${escapeHtml(row.symbol)}</strong>
+            <span>${escapeHtml(row.price)}</span>
+            <span class="${row.change.startsWith("-") ? "down" : "up"}">${escapeHtml(row.change)}</span>
+            <span>${escapeHtml(row.volume)}</span>
+            <small>${escapeHtml(row.source)}</small>
+          </div>
+        `,
+      )
+      .join("")}
+  `;
+  output.textContent = verification.report;
+}
+
+async function refreshLiveVerification() {
+  $("#liveVerificationSummary").textContent = "Refreshing prices, news and calendar...";
+  await Promise.allSettled([marketData.refresh(), loadNewsFeed(), loadEconomicCalendar()]);
+  renderLiveVerification();
+  showToast("Live verification refreshed.");
+}
+
+async function sendTelegramAlert() {
+  const report = state.liveVerification.telegramText || buildLiveVerificationReport().report;
+  $("#liveVerificationSummary").textContent = "Sending Telegram alert...";
+  try {
+    const response = await fetch("/api/telegram/alert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: report,
+        context: {
+          decision: state.liveVerification.decision,
+          blockers: state.liveVerification.blockers,
+          marketStatus: state.market.status,
+          updatedAt: state.market.lastUpdated?.toISOString?.() || null,
+        },
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Telegram send failed.");
+    agentConsoleLog("Telegram alert", `Message sent: ${data.telegram?.message_id || "ok"}`);
+    showToast("Telegram alert sent.");
+    await loadCloudJournal();
+  } catch (error) {
+    agentConsoleLog("Telegram alert blocked", error.message);
+    $("#liveVerificationSummary").textContent = `Telegram blocked: ${error.message}`;
+    showToast("Telegram alert blocked. Check Cloudflare secrets.");
+  } finally {
+    renderLiveVerification();
+  }
 }
 
 async function loadNewsFeed() {
@@ -4278,6 +4407,8 @@ function bindEvents() {
   });
 
   $("#loadNewsFeed")?.addEventListener("click", loadNewsFeed);
+  $("#refreshLiveVerification")?.addEventListener("click", refreshLiveVerification);
+  $("#sendTelegramAlert")?.addEventListener("click", sendTelegramAlert);
   $("#refreshJournalCloud")?.addEventListener("click", loadCloudJournal);
   $("#exportAuditBundle")?.addEventListener("click", exportAuditBundle);
 
@@ -4520,6 +4651,7 @@ bootStep("market status", updateMarketStatus);
 bootStep("premium chart cockpit", renderPremiumChart);
 bootStep("ticker", renderTickerTape);
 bootStep("market board", renderQuickMarketBoard);
+bootStep("live verification", renderLiveVerification);
 bootStep("scanner", renderScanner);
 bootStep("prediction markets", renderPredictionMarkets);
 bootStep("economic calendar", renderEconomicCalendar);
