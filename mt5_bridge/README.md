@@ -19,6 +19,7 @@ n8n/VPS health check aliases:
 ```text
 GET /health
 GET /status
+GET /guard
 ```
 
 Order routes:
@@ -28,12 +29,23 @@ POST /order/preview
 POST /order/submit
 ```
 
+Guard and paper routes:
+
+```text
+POST /kill
+POST /kill/clear
+POST /positions/flatten
+POST /paper/reset
+POST /paper/close
+```
+
 The legacy `/send_order` route is intentionally blocked. n8n must call
 `/order/preview` first and live submit must still pass Zeus manual approval.
 
 ## Live Mode
 
 By default the bridge is safe: it previews and journals but will not submit live orders.
+Approved submits are recorded as paper positions while `MT5_ENABLE_LIVE=false`.
 
 To enable real MT5 order routing on a machine with MetaTrader 5 open and logged in:
 
@@ -48,5 +60,19 @@ Hard rules stay enforced by the dashboard and bridge:
 - approved Zeus preview required
 - manual approval token required
 - spread cap checked
-- kill switch route available
+- hard bridge guard blocks preview/submit when kill switch or drawdown rules are active
+- daily loss and static drawdown buffers are persisted in `logs/mt5_guard_state.json`
+- `/positions/flatten` activates the kill switch before closing or dry-running closes
+- optional `MT5_KILL_TOKEN` protects `/kill`, `/kill/clear`, `/paper/reset`, and `/paper/close`
+- dry-run submit creates a paper ledger position instead of contacting MT5
 - every preview/submit/flatten action is journaled
+
+Recommended production environment:
+
+```text
+MT5_ENABLE_LIVE=false
+MT5_KILL_TOKEN=long-random-admin-token
+MT5_GUARD_INITIAL_BALANCE=100000
+MT5_GUARD_DAILY_LOSS_LIMIT_PERCENT=0.03
+MT5_GUARD_MAX_TOTAL_DRAWDOWN_PERCENT=0.06
+```

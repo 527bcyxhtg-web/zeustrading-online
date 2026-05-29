@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -28,9 +28,14 @@ except Exception:  # pragma: no cover - depends on host terminal installation.
 BRIDGE_VERSION = "zeus-mt5-bridge/1.0.0"
 DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "BTCUSD", "US30", "NAS100"]
 JOURNAL_PATH = Path(os.getenv("MT5_BRIDGE_JOURNAL", "logs/mt5_bridge_journal.jsonl"))
+GUARD_STATE_PATH = Path(os.getenv("MT5_GUARD_STATE", "logs/mt5_guard_state.json"))
 LIVE_ENABLED = os.getenv("MT5_ENABLE_LIVE", "false").lower() == "true"
 REQUIRE_MT5 = os.getenv("MT5_REQUIRE_TERMINAL", "false").lower() == "true"
 MAX_SPREAD_POINTS = float(os.getenv("MT5_MAX_SPREAD_POINTS", "80"))
+GUARD_INITIAL_BALANCE = float(os.getenv("MT5_GUARD_INITIAL_BALANCE", "100000"))
+GUARD_DAILY_LOSS_LIMIT_PERCENT = float(os.getenv("MT5_GUARD_DAILY_LOSS_LIMIT_PERCENT", "0.03"))
+GUARD_MAX_TOTAL_DRAWDOWN_PERCENT = float(os.getenv("MT5_GUARD_MAX_TOTAL_DRAWDOWN_PERCENT", "0.06"))
+KILL_TOKEN = os.getenv("MT5_KILL_TOKEN", "")
 
 
 def utc_now() -> str:
@@ -49,6 +54,175 @@ def write_journal(event_type: str, payload: dict[str, Any]) -> str:
     with JOURNAL_PATH.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, separators=(",", ":"), ensure_ascii=True) + "\n")
     return journal_id
+
+
+def today_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def default_guard_state() -> dict[str, Any]:
+    return {
+        "kill_switch_active": False,
+        "kill_reason": "",
+        "kill_updated_at": None,
+        "trade_date": today_key(),
+        "initial_balance": GUARD_INITIAL_BALANCE,
+        "daily_start_equity": GUARD_INITIAL_BALANCE,
+        "high_water_equity": GUARD_INITIAL_BALANCE,
+        "daily_realized_pnl": 0.0,
+        "daily_unrealized_pnl": 0.0,
+        "daily_loss_limit_percent": GUARD_DAILY_LOSS_LIMIT_PERCENT,
+        "max_total_drawdown_percent": GUARD_MAX_TOTAL_DRAWDOWN_PERCENT,
+        "paper_positions": [],
+        "paper_closed_trades": [],
+    }
+
+
+def load_guard_state() -> dict[str, Any]:
+    if not GUARD_STATE_PATH.exists():
+        return default_guard_state()
+    try:
+        loaded = json.loads(GUARD_STATE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        loaded = {}
+    state = {**default_guard_state(), **loaded}
+    if state.get("trade_date") != today_key():
+        state["trade_date"] = today_key()
+        state["daily_start_equity"] = float(state.get("high_water_equity") or state.get("initial_balance") or GUARD_INITIAL_BALANCE)
+        state["daily_realized_pnl"] = 0.0
+        state["daily_unrealized_pnl"] = 0.0
+    return state
+
+
+def save_guard_state(state: dict[str, Any]) -> dict[str, Any]:
+    GUARD_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    GUARD_STATE_PATH.write_text(json.dumps(state, indent=2, sort_keys=True, ensure_ascii=True), encoding="utf-8")
+    return state
+
+
+def require_guard_token(headers: dict[str, str] | None, payload: dict[str, Any] | None) -> None:
+    if not KILL_TOKEN:
+        return
+    supplied = ""
+    if headers:
+        supplied = headers.get("x-zeus-token") or headers.get("X-Zeus-Token") or ""
+    supplied = supplied or str((payload or {}).get("token") or "")
+    if supplied != KILL_TOKEN:
+        raise HTTPException(status_code=401, detail="Valid MT5_KILL_TOKEN is required.")
+
+
+def account_equity_for_guard(account: dict[str, Any], state: dict[str, Any]) -> float:
+    equity = account.get("equity")
+    if equity is not None:
+        return float(equity)
+    return float(state.get("initial_balance") or GUARD_INITIAL_BALANCE) + float(state.get("daily_realized_pnl") or 0) + float(state.get("daily_unrealized_pnl") or 0)
+
+
+def refresh_guard_state(account: dict[str, Any] | None = None) -> dict[str, Any]:
+    state = load_guard_state()
+    account = account or account_snapshot()
+    equity = account_equity_for_guard(account, state)
+    state["high_water_equity"] = max(float(state.get("high_water_equity") or equity), equity)
+    if not state.get("initial_balance"):
+        state["initial_balance"] = equity
+    if not state.get("daily_start_equity"):
+        state["daily_start_equity"] = equity
+    save_guard_state(state)
+    return state
+
+
+def guard_summary(account: dict[str, Any] | None = None) -> dict[str, Any]:
+    account = account or account_snapshot()
+    state = refresh_guard_state(account)
+    equity = account_equity_for_guard(account, state)
+    daily_start = float(state.get("daily_start_equity") or GUARD_INITIAL_BALANCE)
+    initial_balance = float(state.get("initial_balance") or GUARD_INITIAL_BALANCE)
+    daily_loss_limit = daily_start * float(state.get("daily_loss_limit_percent") or GUARD_DAILY_LOSS_LIMIT_PERCENT)
+    max_total_loss = initial_balance * float(state.get("max_total_drawdown_percent") or GUARD_MAX_TOTAL_DRAWDOWN_PERCENT)
+    static_floor = initial_balance - max_total_loss
+    daily_pnl = equity - daily_start
+    daily_loss_buffer = daily_loss_limit + daily_pnl
+    max_drawdown_buffer = equity - static_floor
+    blockers = []
+
+    if state.get("kill_switch_active"):
+        blockers.append(f"Kill switch active: {state.get('kill_reason') or 'manual stop'}")
+    if daily_loss_buffer <= 0:
+        blockers.append("Daily drawdown buffer is breached.")
+    if max_drawdown_buffer <= 0:
+        blockers.append("Max total drawdown buffer is breached.")
+
+    auto_killed = False
+    if not state.get("kill_switch_active") and (daily_loss_buffer <= 0 or max_drawdown_buffer <= 0):
+        state["kill_switch_active"] = True
+        state["kill_reason"] = "Automatic drawdown guard triggered."
+        state["kill_updated_at"] = utc_now()
+        save_guard_state(state)
+        auto_killed = True
+        blockers.insert(0, state["kill_reason"])
+        write_journal("auto_kill_switch", {"state": state, "equity": equity, "blockers": blockers})
+
+    return {
+        "ok": not blockers,
+        "auto_killed": auto_killed,
+        "blockers": blockers,
+        "state": state,
+        "account": account,
+        "equity": round(equity, 2),
+        "daily_pnl": round(daily_pnl, 2),
+        "daily_loss_limit": round(daily_loss_limit, 2),
+        "daily_loss_buffer_remaining": round(max(daily_loss_buffer, 0), 2),
+        "static_drawdown_floor": round(static_floor, 2),
+        "max_drawdown_buffer_remaining": round(max(max_drawdown_buffer, 0), 2),
+    }
+
+
+def guard_blockers(account: dict[str, Any] | None = None) -> list[str]:
+    return guard_summary(account)["blockers"]
+
+
+def record_paper_position(preview_result: dict[str, Any], approval_token: str) -> dict[str, Any]:
+    state = refresh_guard_state()
+    position = {
+        "id": str(uuid.uuid4()),
+        "opened_at": utc_now(),
+        "approval_token_hash": str(abs(hash(approval_token))),
+        "symbol": preview_result["symbol"],
+        "side": preview_result["side"],
+        "entry": float(preview_result["entry"]),
+        "stop_loss": float(preview_result["stop_loss"]),
+        "take_profit": float(preview_result["take_profit"]),
+        "quantity": float(preview_result["quantity"]),
+        "estimated_risk": round(abs(float(preview_result["entry"]) - float(preview_result["stop_loss"])) * float(preview_result["quantity"]), 5),
+        "estimated_reward": round(abs(float(preview_result["take_profit"]) - float(preview_result["entry"])) * float(preview_result["quantity"]), 5),
+        "status": "open",
+    }
+    state.setdefault("paper_positions", []).append(position)
+    save_guard_state(state)
+    write_journal("paper_position_opened", {"position": position})
+    return position
+
+
+def close_paper_positions(reason: str = "manual paper close") -> dict[str, Any]:
+    state = refresh_guard_state()
+    open_positions = [item for item in state.get("paper_positions", []) if item.get("status") == "open"]
+    closed = []
+    realized = float(state.get("daily_realized_pnl") or 0)
+    for position in open_positions:
+        quote_data = get_quote(position["symbol"])
+        close_price = float(quote_data["bid"] if position["side"] == "BUY" else quote_data["ask"])
+        multiplier = 1 if position["side"] == "BUY" else -1
+        pnl = (close_price - float(position["entry"])) * multiplier * float(position["quantity"])
+        position = {**position, "status": "closed", "closed_at": utc_now(), "close_price": close_price, "pnl": round(pnl, 5), "close_reason": reason}
+        closed.append(position)
+        realized += pnl
+    remaining = [item for item in state.get("paper_positions", []) if item.get("status") != "open"]
+    state["paper_positions"] = remaining
+    state.setdefault("paper_closed_trades", []).extend(closed)
+    state["daily_realized_pnl"] = realized
+    save_guard_state(state)
+    write_journal("paper_positions_closed", {"closed": closed, "reason": reason})
+    return {"closed_count": len(closed), "closed": closed, "daily_realized_pnl": round(realized, 5)}
 
 
 def mt5_available() -> bool:
@@ -191,6 +365,8 @@ def build_preview(preview: PreviewRequest) -> dict[str, Any]:
     target = preview.target_value
     quantity = float(preview.quantity or 0)
     quote = get_quote(symbol)
+    guard = guard_summary()
+    blockers.extend(guard["blockers"])
 
     if preview.exchange != "mt5-bridge":
         blockers.append("Bridge accepts only mt5-bridge previews.")
@@ -223,6 +399,7 @@ def build_preview(preview: PreviewRequest) -> dict[str, Any]:
         "take_profit": target,
         "quantity": quantity,
         "quote": quote,
+        "guard": guard,
         "blockers": blockers,
         "timestamp": utc_now(),
     }
@@ -248,12 +425,14 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, Any]:
     account = account_snapshot()
+    guard = guard_summary(account)
     return {
         "ok": True,
         "version": BRIDGE_VERSION,
         "live_enabled": LIVE_ENABLED,
         "mt5_module_available": mt5_available(),
         "account": account,
+        "guard": guard,
         "timestamp": utc_now(),
     }
 
@@ -267,8 +446,63 @@ def status() -> dict[str, Any]:
 @app.get("/account")
 def account() -> dict[str, Any]:
     snapshot = account_snapshot()
-    write_journal("account_snapshot", snapshot)
-    return {"ok": True, "account": snapshot}
+    guard = guard_summary(snapshot)
+    write_journal("account_snapshot", {"account": snapshot, "guard": guard})
+    return {"ok": True, "account": snapshot, "guard": guard}
+
+
+@app.get("/guard")
+def guard() -> dict[str, Any]:
+    return {"ok": True, "guard": guard_summary()}
+
+
+@app.post("/kill")
+def engage_kill(payload: dict[str, Any] | None = None, x_zeus_token: str | None = Header(None)) -> dict[str, Any]:
+    require_guard_token({"x-zeus-token": x_zeus_token or ""}, payload)
+    state = load_guard_state()
+    state["kill_switch_active"] = True
+    state["kill_reason"] = str((payload or {}).get("reason") or "Manual bridge kill switch.")
+    state["kill_updated_at"] = utc_now()
+    save_guard_state(state)
+    response = {"ok": True, "guard": guard_summary(), "reason": state["kill_reason"]}
+    response["journal_id"] = write_journal("manual_kill_switch", response)
+    return response
+
+
+@app.post("/kill/clear")
+def clear_kill(payload: dict[str, Any] | None = None, x_zeus_token: str | None = Header(None)) -> dict[str, Any]:
+    require_guard_token({"x-zeus-token": x_zeus_token or ""}, payload)
+    state = load_guard_state()
+    state["kill_switch_active"] = False
+    state["kill_reason"] = str((payload or {}).get("reason") or "Manual bridge kill clear.")
+    state["kill_updated_at"] = utc_now()
+    save_guard_state(state)
+    response = {"ok": True, "guard": guard_summary(), "reason": state["kill_reason"]}
+    response["journal_id"] = write_journal("manual_kill_switch_clear", response)
+    return response
+
+
+@app.post("/paper/reset")
+def paper_reset(payload: dict[str, Any] | None = None, x_zeus_token: str | None = Header(None)) -> dict[str, Any]:
+    require_guard_token({"x-zeus-token": x_zeus_token or ""}, payload)
+    balance = float((payload or {}).get("initial_balance") or GUARD_INITIAL_BALANCE)
+    state = default_guard_state()
+    state["initial_balance"] = balance
+    state["daily_start_equity"] = balance
+    state["high_water_equity"] = balance
+    save_guard_state(state)
+    response = {"ok": True, "guard": guard_summary(), "reason": "Paper ledger reset."}
+    response["journal_id"] = write_journal("paper_ledger_reset", response)
+    return response
+
+
+@app.post("/paper/close")
+def paper_close(payload: dict[str, Any] | None = None, x_zeus_token: str | None = Header(None)) -> dict[str, Any]:
+    require_guard_token({"x-zeus-token": x_zeus_token or ""}, payload)
+    result = close_paper_positions(str((payload or {}).get("reason") or "manual paper close"))
+    response = {"ok": True, "result": result, "guard": guard_summary()}
+    response["journal_id"] = write_journal("paper_close_request", response)
+    return response
 
 
 @app.get("/symbols")
@@ -302,11 +536,13 @@ def order_submit(request: SubmitRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="Manual approval token is required.")
 
     if not LIVE_ENABLED:
+        position = record_paper_position(preview_result, request.approvalToken)
         payload = {
             "ok": True,
             "submitted": False,
             "dry_run": True,
-            "reason": "Bridge accepted approval, but MT5_ENABLE_LIVE=false so no live order was sent.",
+            "paper_position": position,
+            "reason": "Bridge accepted approval and recorded a paper position. MT5_ENABLE_LIVE=false so no live order was sent.",
             "preview": preview_result,
         }
         payload["journal_id"] = write_journal("order_submit_dry_run", payload)
@@ -369,13 +605,22 @@ def deprecated_send_order(payload: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/positions/flatten")
 def flatten_positions(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    state = load_guard_state()
+    state["kill_switch_active"] = True
+    state["kill_reason"] = str((payload or {}).get("reason") or "Flatten/kill switch requested.")
+    state["kill_updated_at"] = utc_now()
+    save_guard_state(state)
+
     if not LIVE_ENABLED:
+        paper_close_result = close_paper_positions(state["kill_reason"])
         response = {
             "ok": True,
             "submitted": False,
             "dry_run": True,
             "reason": "Kill switch recorded. MT5_ENABLE_LIVE=false so no positions were closed.",
             "request": payload or {},
+            "paper_close": paper_close_result,
+            "guard": guard_summary(),
         }
         response["journal_id"] = write_journal("kill_switch_dry_run", response)
         return response

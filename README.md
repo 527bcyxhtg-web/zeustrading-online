@@ -177,10 +177,24 @@ Protected MT5 bridge local run:
 ```bash
 uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
 curl http://127.0.0.1:8789/health
+curl http://127.0.0.1:8789/guard
 ```
 
-The bridge previews and journals by default. Real MT5 live routing requires an
-open/logged-in MT5 terminal plus:
+The bridge previews and journals by default. Approved submits are paper-ledger
+positions while `MT5_ENABLE_LIVE=false`. The bridge also has a hard runtime
+guard, so preview and submit are blocked when the local kill switch or drawdown
+rules are active.
+
+Useful guard routes:
+
+```bash
+curl -X POST http://127.0.0.1:8789/kill -H "Content-Type: application/json" -d '{"reason":"manual stop"}'
+curl -X POST http://127.0.0.1:8789/kill/clear -H "Content-Type: application/json" -d '{"reason":"reset after review"}'
+curl -X POST http://127.0.0.1:8789/paper/reset -H "Content-Type: application/json" -d '{"initial_balance":100000}'
+```
+
+Set `MT5_KILL_TOKEN` on a VPS to require `X-Zeus-Token` for admin guard routes.
+Real MT5 live routing requires an open/logged-in MT5 terminal plus:
 
 ```bash
 MT5_ENABLE_LIVE=true MT5_REQUIRE_TERMINAL=true uvicorn mt5_bridge.server:app --host 127.0.0.1 --port 8789
