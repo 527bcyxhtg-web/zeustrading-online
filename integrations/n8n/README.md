@@ -16,23 +16,24 @@ What it does:
 2. Calls the MT5 bridge `/health` endpoint.
 3. Stops before market scanning and sends a Zeus Telegram alert if the bridge is
    not demo-live ready.
-4. Loads scanner strategies from the workflow config.
-5. Fetches hourly crypto candles from CoinGecko only after the bridge passes.
-6. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA, RSI, MACD,
+4. Calls the Zeus economic calendar and blocks high-impact USD macro risk.
+5. Loads scanner strategies from the workflow config.
+6. Fetches hourly crypto candles from CoinGecko only after bridge and calendar pass.
+7. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA, RSI, MACD,
    and volume-spike variants.
-7. If a strategy creates a candidate, sends it to:
+8. If a strategy creates a candidate, sends it to:
 
 ```text
 https://zeustrading.online/api/agentscope/orchestrate
 ```
 
-8. Sends Telegram through the Zeus backend:
+9. Sends Telegram through the Zeus backend:
 
 ```text
 https://zeustrading.online/api/telegram/alert
 ```
 
-9. Optionally sends the result to the local/VPS MT5 bridge preview route:
+10. Optionally sends the result to the local/VPS MT5 bridge preview route:
 
 ```text
 http://127.0.0.1:8789/order/preview
@@ -59,6 +60,7 @@ such as `price_above_ema`, `price_below_ema`, `rsi_above`, `rsi_below`,
 
 - The workflow creates candidates only.
 - The workflow stops before CoinGecko scanning when the MT5 bridge is not ready.
+- The workflow stops before strategy scanning when Zeus calendar risk is high.
 - Multiple symbols/strategies are scanned from one config node.
 - Indicator data is passed to Zeus AgentScope; OpenRouter/API secrets stay in
   the Zeus backend, not inside n8n.

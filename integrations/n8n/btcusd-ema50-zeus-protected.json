@@ -92,6 +92,76 @@
     },
     {
       "parameters": {
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/economic-calendar?focus=usd",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "zeus-economic-calendar-check",
+      "name": "Zeus economic calendar check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1140,
+        220
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const calendar = $input.first().json || {};\nconst highEvents = Array.isArray(calendar.events)\n  ? calendar.events.filter((event) => String(event.impact || '').toLowerCase() === 'high')\n  : [];\nconst riskLevel = String(calendar.riskLevel || 'unknown').toLowerCase();\nconst blocked = calendar.ok !== true || riskLevel === 'high' || highEvents.length > 0;\n\nreturn [{\n  json: {\n    macro_clear: !blocked,\n    macro_risk_level: riskLevel,\n    calendar_source: calendar.source || 'unknown',\n    high_impact_count: highEvents.length,\n    high_impact_events: highEvents.slice(0, 5).map((event) => ({\n      time: event.time,\n      currency: event.currency,\n      event: event.event,\n      action: event.action\n    })),\n    checked_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "normalize-macro-calendar",
+      "name": "Normalize macro calendar gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.macro_clear }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "macro-clear",
+      "name": "Macro calendar clear?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/telegram/alert",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"message\": \"Macro calendar blocked scanner\nRisk level: \" + $json.macro_risk_level + \"\nHigh-impact events: \" + $json.high_impact_count + \"\nSource: \" + $json.calendar_source + \"\n\nWorkflow stopped before strategy scan. Verify Investing economic calendar manually.\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "macro-blocked-alert",
+      "name": "Send macro blocked Telegram alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1860,
+        420
+      ]
+    },
+    {
+      "parameters": {
         "jsCode": "const strategies = [\n  {\n    id: 'btc_ema50_rsi_momentum',\n    symbol: 'BTCUSD',\n    coinGeckoId: 'bitcoin',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'EMA_RSI_MACD_VOLUME',\n    setup: 'BTCUSD EMA50 momentum with RSI/MACD/volume confirmation',\n    conditions: {\n      price_above_ema: 50,\n      rsi_above: 45,\n      macd_bullish: true,\n      volume_spike: 1.05\n    },\n    riskPercent: 0.25,\n    spreadPercent: 0.03,\n    newsRisk: 'low',\n    slPercent: 0.98,\n    tpPercent: 1.02,\n    active: true\n  },\n  {\n    id: 'eth_ema20_macd',\n    symbol: 'ETHUSD',\n    coinGeckoId: 'ethereum',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'EMA_MACD_TREND',\n    setup: 'ETHUSD EMA20 trend with MACD confirmation',\n    conditions: {\n      price_above_ema: 20,\n      macd_bullish: true\n    },\n    riskPercent: 0.25,\n    spreadPercent: 0.04,\n    newsRisk: 'low',\n    slPercent: 0.97,\n    tpPercent: 1.03,\n    active: true\n  },\n  {\n    id: 'btc_rsi_reclaim',\n    symbol: 'BTCUSD',\n    coinGeckoId: 'bitcoin',\n    direction: 'LONG',\n    timeframe: '1h',\n    days: 7,\n    strategy: 'RSI_RECLAIM',\n    setup: 'BTCUSD RSI recovery above EMA20',\n    conditions: {\n      price_above_ema: 20,\n      rsi_above: 50,\n      volume_spike: 1.0\n    },\n    riskPercent: 0.2,\n    spreadPercent: 0.03,\n    newsRisk: 'low',\n    slPercent: 0.985,\n    tpPercent: 1.025,\n    active: true\n  }\n];\n\nreturn strategies\n  .filter((strategy) => strategy.active !== false)\n  .map((strategy) => ({ json: { ...strategy, scanner_loaded_at: new Date().toISOString() } }));"
       },
       "id": "load-scanner-strategies",
@@ -99,7 +169,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1140,
+        1860,
         220
       ]
     },
@@ -115,7 +185,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1380,
+        2100,
         220
       ]
     },
@@ -128,7 +198,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1620,
+        2340,
         220
       ]
     },
@@ -148,7 +218,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        1860,
+        2580,
         220
       ]
     },
@@ -168,7 +238,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2100,
+        2820,
         220
       ]
     },
@@ -188,7 +258,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2340,
+        3060,
         220
       ]
     },
@@ -208,7 +278,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2580,
+        3300,
         220
       ]
     }
@@ -251,7 +321,7 @@
       "main": [
         [
           {
-            "node": "Load scanner strategies",
+            "node": "Zeus economic calendar check",
             "type": "main",
             "index": 0
           }
@@ -320,6 +390,46 @@
           },
           {
             "node": "Optional MT5 preview only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeus economic calendar check": {
+      "main": [
+        [
+          {
+            "node": "Normalize macro calendar gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize macro calendar gate": {
+      "main": [
+        [
+          {
+            "node": "Macro calendar clear?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Macro calendar clear?": {
+      "main": [
+        [
+          {
+            "node": "Load scanner strategies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send macro blocked Telegram alert",
             "type": "main",
             "index": 0
           }

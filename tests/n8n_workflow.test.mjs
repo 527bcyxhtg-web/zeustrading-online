@@ -10,6 +10,10 @@ assert.equal(workflow.name, "Zeus Protected BTCUSD EMA50 Scanner");
 assert.ok(nodeNames.includes("MT5 bridge health precheck"));
 assert.ok(nodeNames.includes("Normalize bridge readiness"));
 assert.ok(nodeNames.includes("Bridge demo-live ready?"));
+assert.ok(nodeNames.includes("Zeus economic calendar check"));
+assert.ok(nodeNames.includes("Normalize macro calendar gate"));
+assert.ok(nodeNames.includes("Macro calendar clear?"));
+assert.ok(nodeNames.includes("Send macro blocked Telegram alert"));
 assert.ok(nodeNames.includes("Load scanner strategies"));
 assert.ok(nodeNames.includes("Fetch crypto hourly history"));
 assert.ok(nodeNames.includes("Calculate strategy candidate"));
@@ -20,6 +24,9 @@ assert.ok(nodeNames.includes("Optional MT5 preview only"));
 
 const serialized = JSON.stringify(workflow);
 assert.match(serialized, /\/health/);
+assert.match(serialized, /api\/economic-calendar/);
+assert.match(serialized, /macro_clear/);
+assert.match(serialized, /Macro calendar blocked scanner/);
 assert.match(serialized, /bridge_ready/);
 assert.match(serialized, /demo_live_ready/);
 assert.match(serialized, /ETHUSD/);
@@ -38,6 +45,7 @@ assert.match(serialized, /manual-approval/);
 
 assert.match(readme, /Safety Contract/);
 assert.match(readme, /stops before CoinGecko scanning/);
+assert.match(readme, /calendar risk is high/);
 assert.match(readme, /EMA, RSI, MACD/);
 assert.match(readme, /OpenRouter\/API secrets stay in/);
 assert.match(readme, /MT5 receives preview requests only/);
