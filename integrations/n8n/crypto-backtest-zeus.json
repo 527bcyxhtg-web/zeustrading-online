@@ -1,0 +1,158 @@
+{
+  "name": "Zeus Crypto Strategy Backtest",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual backtest trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const strategies = [\n  {\n    id: 'btc_ema50_rsi_momentum',\n    symbol: 'BTCUSD',\n    coinGeckoId: 'bitcoin',\n    direction: 'LONG',\n    days: 90,\n    conditions: { price_above_ema: 50, rsi_above: 45, macd_bullish: true, volume_spike: 1.05 },\n    slPercent: 0.98,\n    tpPercent: 1.02,\n    riskPercent: 0.25,\n    active: true\n  },\n  {\n    id: 'eth_ema20_macd',\n    symbol: 'ETHUSD',\n    coinGeckoId: 'ethereum',\n    direction: 'LONG',\n    days: 90,\n    conditions: { price_above_ema: 20, macd_bullish: true },\n    slPercent: 0.97,\n    tpPercent: 1.03,\n    riskPercent: 0.25,\n    active: true\n  }\n];\n\nreturn strategies.filter((strategy) => strategy.active).map((strategy) => ({ json: strategy }));"
+      },
+      "id": "load-backtest-strategies",
+      "name": "Load backtest strategies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.coingecko.com/api/v3/coins/' + $json.coinGeckoId + '/market_chart?vs_currency=usd&days=' + $json.days + '&interval=hourly' }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-backtest-history",
+      "name": "Fetch backtest history",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const history = $input.first().json || {};\nconst strategy = $('Load backtest strategies').item.json;\nconst prices = (history.prices || []).map((row) => ({ time: row[0], price: Number(row[1]) })).filter((row) => Number.isFinite(row.price));\nconst volumes = (history.total_volumes || []).map((row) => Number(row[1])).filter((value) => Number.isFinite(value));\nconst conditions = strategy.conditions || {};\nconst accountSize = 10000;\nconst riskAmount = accountSize * (Number(strategy.riskPercent || 0.25) / 100);\nconst maxHoldBars = 8;\n\nfunction ema(values, period) {\n  if (!period || values.length < period) return null;\n  let result = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;\n  const multiplier = 2 / (period + 1);\n  for (let index = period; index < values.length; index += 1) result = (values[index] - result) * multiplier + result;\n  return result;\n}\n\nfunction rsi(values, period = 14) {\n  if (values.length < period + 1) return null;\n  let gains = 0;\n  let losses = 0;\n  for (let index = 1; index <= period; index += 1) {\n    const diff = values[index] - values[index - 1];\n    if (diff >= 0) gains += diff;\n    else losses -= diff;\n  }\n  let avgGain = gains / period;\n  let avgLoss = losses / period;\n  for (let index = period + 1; index < values.length; index += 1) {\n    const diff = values[index] - values[index - 1];\n    if (diff >= 0) {\n      avgGain = (avgGain * (period - 1) + diff) / period;\n      avgLoss = (avgLoss * (period - 1)) / period;\n    } else {\n      avgGain = (avgGain * (period - 1)) / period;\n      avgLoss = (avgLoss * (period - 1) - diff) / period;\n    }\n  }\n  if (avgLoss === 0) return 100;\n  return 100 - (100 / (1 + avgGain / avgLoss));\n}\n\nfunction macd(values) {\n  if (values.length < 52) return null;\n  const current = ema(values, 12) - ema(values, 26);\n  const previousValues = values.slice(0, -1);\n  const previous = ema(previousValues, 12) - ema(previousValues, 26);\n  return { bullish: current > 0 && current > previous };\n}\n\nfunction volumeSpike(values, index, lookback = 20) {\n  if (index < lookback || values.length <= index) return 1;\n  const recent = values.slice(index - lookback, index);\n  const avg = recent.reduce((sum, value) => sum + value, 0) / recent.length;\n  return avg > 0 ? values[index] / avg : 1;\n}\n\nfunction signalAt(index) {\n  const slice = prices.slice(0, index + 1).map((row) => row.price);\n  const current = slice.at(-1);\n  const emaPeriod = conditions.price_above_ema || conditions.price_below_ema;\n  const emaValue = ema(slice, emaPeriod);\n  const rsiValue = (conditions.rsi_above || conditions.rsi_below) ? rsi(slice) : null;\n  const macdValue = (conditions.macd_bullish || conditions.macd_bearish) ? macd(slice) : null;\n  const volSpike = conditions.volume_spike ? volumeSpike(volumes, index) : 1;\n\n  if (conditions.price_above_ema && !(emaValue !== null && current > emaValue)) return false;\n  if (conditions.price_below_ema && !(emaValue !== null && current < emaValue)) return false;\n  if (conditions.rsi_above && !(rsiValue !== null && rsiValue > conditions.rsi_above)) return false;\n  if (conditions.rsi_below && !(rsiValue !== null && rsiValue < conditions.rsi_below)) return false;\n  if (conditions.macd_bullish && !(macdValue && macdValue.bullish)) return false;\n  if (conditions.volume_spike && volSpike < conditions.volume_spike) return false;\n  return true;\n}\n\nconst trades = [];\nlet balance = accountSize;\nlet equityPeak = accountSize;\nlet maxDrawdown = 0;\nlet cursor = 60;\n\nwhile (cursor < prices.length - maxHoldBars - 1) {\n  if (!signalAt(cursor)) {\n    cursor += 1;\n    continue;\n  }\n  const entry = prices[cursor].price;\n  const stop = entry * Number(strategy.slPercent || 0.98);\n  const target = entry * Number(strategy.tpPercent || 1.02);\n  const unitRisk = Math.max(Math.abs(entry - stop), 1);\n  const size = riskAmount / unitRisk;\n  let exit = prices[cursor + maxHoldBars].price;\n  let exitReason = 'time_exit';\n\n  for (let offset = 1; offset <= maxHoldBars; offset += 1) {\n    const price = prices[cursor + offset].price;\n    if (strategy.direction === 'LONG' && price <= stop) {\n      exit = stop;\n      exitReason = 'stop_loss';\n      break;\n    }\n    if (strategy.direction === 'LONG' && price >= target) {\n      exit = target;\n      exitReason = 'take_profit';\n      break;\n    }\n  }\n\n  const pnl = (exit - entry) * size;\n  balance += pnl;\n  equityPeak = Math.max(equityPeak, balance);\n  maxDrawdown = Math.max(maxDrawdown, equityPeak - balance);\n  trades.push({ entryTime: prices[cursor].time, entry, exit, exitReason, pnl: Number(pnl.toFixed(2)) });\n  cursor += maxHoldBars;\n}\n\nconst wins = trades.filter((trade) => trade.pnl > 0);\nconst losses = trades.filter((trade) => trade.pnl <= 0);\nconst grossWin = wins.reduce((sum, trade) => sum + trade.pnl, 0);\nconst grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.pnl, 0));\nreturn [{\n  json: {\n    strategy_id: strategy.id,\n    symbol: strategy.symbol,\n    trades: trades.length,\n    wins: wins.length,\n    losses: losses.length,\n    win_rate: trades.length ? Number(((wins.length / trades.length) * 100).toFixed(2)) : 0,\n    net_pnl: Number((balance - accountSize).toFixed(2)),\n    ending_balance: Number(balance.toFixed(2)),\n    profit_factor: grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(2)) : grossWin > 0 ? 99 : 0,\n    max_drawdown: Number(maxDrawdown.toFixed(2)),\n    sample_trades: trades.slice(-5),\n    source: 'n8n-backtest-simulation',\n    note: 'Research only. This is not permission for live execution.'\n  }\n}];"
+      },
+      "id": "run-backtest-simulation",
+      "name": "Run backtest simulation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/journal",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"eventType\": \"n8n_backtest_result\",\n  \"payload\": $json\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "save-backtest-journal",
+      "name": "Save backtest journal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/telegram/alert",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"message\": \"Backtest complete\nStrategy: \" + $json.payload.strategy_id + \"\nSymbol: \" + $json.payload.symbol + \"\nTrades: \" + $json.payload.trades + \"\nWin rate: \" + $json.payload.win_rate + \"%\nNet P/L: \" + $json.payload.net_pnl + \"\nProfit factor: \" + $json.payload.profit_factor + \"\nMax DD: \" + $json.payload.max_drawdown + \"\n\nResearch only. No live execution.\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "send-backtest-telegram-summary",
+      "name": "Send backtest Telegram summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1440,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual backtest trigger": {
+      "main": [
+        [
+          {
+            "node": "Load backtest strategies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load backtest strategies": {
+      "main": [
+        [
+          {
+            "node": "Fetch backtest history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch backtest history": {
+      "main": [
+        [
+          {
+            "node": "Run backtest simulation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run backtest simulation": {
+      "main": [
+        [
+          {
+            "node": "Save backtest journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save backtest journal": {
+      "main": [
+        [
+          {
+            "node": "Send backtest Telegram summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

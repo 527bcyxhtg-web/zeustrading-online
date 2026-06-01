@@ -78,3 +78,26 @@ such as `price_above_ema`, `price_below_ema`, `rsi_above`, `rsi_below`,
 3. Paste the JSON from `btcusd-ema50-zeus-protected.json`.
 4. Set `ZEUS_BASE_URL` and `MT5_BRIDGE_URL` in n8n environment variables if needed.
 5. Activate after testing one manual run.
+
+## Crypto Strategy Backtest
+
+File:
+
+```text
+integrations/n8n/crypto-backtest-zeus.json
+```
+
+What it does:
+
+1. Runs only from a manual trigger.
+2. Loads backtest strategies from one config node.
+3. Fetches 90 days of hourly CoinGecko history.
+4. Simulates entry, SL, TP, time exit, win rate, profit factor, net P/L, and max drawdown.
+5. Saves each result through Zeus `/api/journal`.
+6. Sends a Telegram summary through Zeus backend.
+
+Safety notes:
+
+- Backtest workflow never calls MT5.
+- Backtest workflow never calls `/order/preview`, `/order/submit`, or `/send_order`.
+- Results are research-only and do not unlock live execution.
