@@ -225,6 +225,26 @@
     {
       "parameters": {
         "method": "POST",
+        "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/journal",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"eventType\": \"n8n_scanner_rejected\",\n  \"payload\": {\n    \"symbol\": $json.symbol,\n    \"strategy\": $json.strategy,\n    \"setup\": $json.setup,\n    \"timeframe\": $json.timeframe,\n    \"current_price\": $json.current_price,\n    \"conditions\": $json.conditions,\n    \"indicators\": $json.indicators,\n    \"rejectionReasons\": $json.rejectionReasons,\n    \"note\": $json.note,\n    \"timestamp\": $json.timestamp,\n    \"source\": \"n8n-indicator-scanner\"\n  }\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "save-rejected-scanner-journal",
+      "name": "Save rejected scanner journal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2820,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
         "url": "={{ $env.ZEUS_BASE_URL || 'https://zeustrading.online' }}/api/agentscope/orchestrate",
         "sendBody": true,
         "contentType": "json",
@@ -377,7 +397,13 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Save rejected scanner journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Zeus AgentScope risk review": {

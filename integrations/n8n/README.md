@@ -21,19 +21,20 @@ What it does:
 6. Fetches hourly crypto candles from CoinGecko only after bridge and calendar pass.
 7. Calculates each strategy condition, currently BTCUSD/ETHUSD EMA, RSI, MACD,
    and volume-spike variants.
-8. If a strategy creates a candidate, sends it to:
+8. Logs rejected/no-signal strategy checks to Zeus journal.
+9. If a strategy creates a candidate, sends it to:
 
 ```text
 https://zeustrading.online/api/agentscope/orchestrate
 ```
 
-9. Sends Telegram through the Zeus backend:
+10. Sends Telegram through the Zeus backend:
 
 ```text
 https://zeustrading.online/api/telegram/alert
 ```
 
-10. Optionally sends the result to the local/VPS MT5 bridge preview route:
+11. Optionally sends the result to the local/VPS MT5 bridge preview route:
 
 ```text
 http://127.0.0.1:8789/order/preview
@@ -64,6 +65,7 @@ such as `price_above_ema`, `price_below_ema`, `rsi_above`, `rsi_below`,
 - Multiple symbols/strategies are scanned from one config node.
 - Indicator data is passed to Zeus AgentScope; OpenRouter/API secrets stay in
   the Zeus backend, not inside n8n.
+- Rejected/no-signal strategy checks are saved through Zeus `/api/journal`.
 - Telegram alerts are not trade instructions.
 - MT5 receives preview requests only.
 - Live submit still requires Zeus risk gate, manual approval token, SL/TP, kill switch availability, and audit logging.
