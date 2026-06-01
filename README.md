@@ -15,6 +15,16 @@ Open `index.html` in a browser. The app keeps journal notes and snapshots in loc
 - Includes Python modules for risk management, VWAP reclaim signal generation, and basic backtest metrics.
 - Upgrades the backend skeleton with mock market data, news filter, economic calendar, strategy engine, execution guard, SQLite audit log, broker order previews, Telegram message builder, and daily reporting utilities.
 
+## Production Start Here
+
+Use [PRODUCTION_RUNBOOK.md](/Users/maki/Documents/Codex/2026-05-19/https-www-forexcracked-com-forex-ea/PRODUCTION_RUNBOOK.md) as the step-by-step launch checklist.
+
+Run the local readiness suite:
+
+```bash
+./scripts/verify_production_readiness.sh
+```
+
 ## MVP Agent Workflow
 
 The first real version should stay paper-only:
@@ -149,14 +159,18 @@ Every dry-run and submit attempt is written to the SQLite audit log.
 
 ## Hosting And Domain
 
-Recommended production split:
+Current production target:
 
-- Frontend dashboard: Netlify static site from `public/`.
-- Backend execution API: Docker host such as Render, Fly.io, Railway, VPS, or private server.
-- Domain: point `www.yourdomain.com` to Netlify and `api.yourdomain.com` to the backend host.
-- Broker keys: backend env vars only. Never put broker keys in Netlify public env or frontend JS.
+- Frontend dashboard: Cloudflare Pages from `public/`.
+- Web backend/API: Cloudflare Pages Worker in `public/_worker.js`.
+- Database: Cloudflare D1 binding `zeustrading_users`.
+- MT5 execution bridge: local/private Windows VPS next to MetaTrader 5.
+- Automation: n8n imports from `integrations/n8n/`.
+- Broker/MT5 keys: backend or bridge environment variables only. Never put keys in browser JavaScript.
 
-Static frontend deploy config is in `netlify.toml`. Replace `https://REPLACE_WITH_BACKEND_DOMAIN` with your backend URL after the API is hosted.
+Use `PRODUCTION_RUNBOOK.md` for the exact step-by-step launch checklist.
+
+Cloudflare deploy config is in `wrangler.toml`.
 
 Backend local run:
 
